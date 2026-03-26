@@ -1,0 +1,13 @@
+# Vercel build ignore file
+
+node_modules/
+.git/
+.gitignore
+.env
+.env.local
+.env._.local
+_.md
+.DS_Store
+.vscode/
+.idea/
+\*.log
