@@ -6,6 +6,17 @@ import { debounce, escapeHtml, getMaqamColor, CATEGORY_LABELS } from '../utils.j
 
 if (!requireAuth()) throw new Error('Not authenticated');
 
+const BOOKMARK_COLOR = '#d4b068';
+
+function isBookmarked(poemId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem('divan_bookmarks') || '[]');
+    return saved.includes(String(poemId));
+  } catch {
+    return false;
+  }
+}
+
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
@@ -169,8 +180,9 @@ function buildPoemCard(poem) {
         </div>
         <div class="flex flex-col items-center gap-2 shrink-0">
           <button class="bookmark-btn text-[#9db8b6] hover:text-yellow-400 hover:bg-white/5
-            p-2 rounded-full transition-all" title="إشارة مرجعية" data-id="${poem.id}">
-            <span class="material-symbols-outlined">bookmark</span>
+            p-2 rounded-full transition-all" title="إشارة مرجعية" data-id="${poem.id}"
+            style="${isBookmarked(poem.id) ? `color:${BOOKMARK_COLOR}` : ''}">
+            <span class="material-symbols-outlined">${isBookmarked(poem.id) ? 'bookmark' : 'bookmark_border'}</span>
           </button>
           ${lead ? `
             <button class="delete-poem-btn text-[#9db8b6] hover:text-red-400 hover:bg-white/5
@@ -213,6 +225,29 @@ function setupCardActions(container) {
     article.addEventListener('click', (e) => {
       if (e.target.closest('button') || e.target.closest('a')) return;
       window.location.href = `view-poem.html?id=${article.dataset.id}`;
+    });
+  });
+
+  // Bookmark toggle
+  container.querySelectorAll('.bookmark-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = String(btn.dataset.id);
+      const saved = JSON.parse(localStorage.getItem('divan_bookmarks') || '[]');
+      const idx = saved.indexOf(id);
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (idx === -1) {
+        saved.push(id);
+        if (icon) icon.textContent = 'bookmark';
+        btn.style.color = BOOKMARK_COLOR;
+        showToast('تم حفظ القصيدة في الإشارات المرجعية', 'success');
+      } else {
+        saved.splice(idx, 1);
+        if (icon) icon.textContent = 'bookmark_border';
+        btn.style.color = '';
+        showToast('تم إزالة القصيدة من الإشارات المرجعية', 'info');
+      }
+      localStorage.setItem('divan_bookmarks', JSON.stringify(saved));
     });
   });
 

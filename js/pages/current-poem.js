@@ -74,7 +74,7 @@ function renderPoem(state) {
   if (poetEl)  poetEl.textContent  = poem.poetName || '';
   if (maqamEl) {
     maqamEl.textContent = poem.maqamName || '';
-    maqamEl.closest('.maqam-pill')?.classList.toggle('hidden', !poem.maqamName);
+    document.getElementById('maqamPill')?.classList.toggle('hidden', !poem.maqamName);
   }
   if (sharedByEl) sharedByEl.textContent = state.sharedByName || '';
   if (sharedAtEl && state.sharedAt) {

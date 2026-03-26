@@ -22,6 +22,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Logout
   document.getElementById('logoutBtn')?.addEventListener('click', logout);
 
+  // Settings button
+  document.getElementById('settingsBtn')?.addEventListener('click', () => {
+    const user = getUser();
+    const role = user?.role === 'LeadMunshid' ? 'منشد رئيسي' : 'منشد';
+    showToast(`${user?.fullName || user?.username} · ${role}`, 'info', 4000);
+  });
+
   // Search form
   const searchInput = document.getElementById('searchInput');
   document.getElementById('searchForm')?.addEventListener('submit', (e) => {
