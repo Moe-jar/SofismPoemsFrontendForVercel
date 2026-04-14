@@ -137,11 +137,14 @@ async function openWaslaDetail(waslaId) {
     detailContainer.innerHTML = `<div class="text-red-400 p-4">${escapeHtml(err.message)}</div>`;
   }
 
-  // Close button
-  document.getElementById('closeWaslaModal')?.addEventListener('click', () => {
-    modal.classList.add('hidden');
-    selectedWaslaId = null;
-  }, { once: true });
+  // Close button (use onclick to avoid accumulating listeners on repeated opens)
+  const closeBtn = document.getElementById('closeWaslaModal');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      modal.classList.add('hidden');
+      selectedWaslaId = null;
+    };
+  }
 
   // Backdrop click
   modal.onclick = (e) => {
