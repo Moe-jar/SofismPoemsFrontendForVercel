@@ -134,10 +134,7 @@ async function submitForm(isDraft = false) {
     showFieldError('contentError', 'نص القصيدة مطلوب');
     valid = false;
   }
-  if (!categoryInput) {
-    showFieldError('categoryError', 'يرجى اختيار تصنيف القصيدة');
-    valid = false;
-  }
+  // Category is optional; backend stores it but does not require it
 
   if (!valid) return;
 
@@ -170,6 +167,7 @@ async function submitForm(isDraft = false) {
   const submitBtn = document.getElementById('submitBtn');
   const draftBtn = document.getElementById('draftBtn');
   const btn = isDraft ? draftBtn : submitBtn;
+  const originalBtnHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML += ' <span style="opacity:.7">...</span>'; }
 
   try {
@@ -179,7 +177,7 @@ async function submitForm(isDraft = false) {
     } else {
       const created = await poemsApi.create(data);
       showToast(isDraft ? 'تم حفظ المسودة بنجاح' : 'تم نشر القصيدة بنجاح', 'success');
-      if (!isDraft) {
+      if (!isDraft && created?.id) {
         setTimeout(() => { window.location.href = `view-poem.html?id=${created.id}`; }, 800);
         return;
       }
@@ -187,7 +185,7 @@ async function submitForm(isDraft = false) {
     setTimeout(() => { window.location.href = 'poems.html'; }, 800);
   } catch (err) {
     showToast(err.message || 'حدث خطأ أثناء الحفظ', 'error');
-    if (btn) { btn.disabled = false; }
+    if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHtml; }
   }
 }
 
