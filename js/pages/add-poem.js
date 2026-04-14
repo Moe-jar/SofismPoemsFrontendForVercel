@@ -37,8 +37,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Cancel
-  document.getElementById('cancelBtn')?.addEventListener('click', () => {
-    history.back();
+  document.getElementById('cancelBtn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (history.length > 1) {
+      history.back();
+    } else {
+      window.location.href = 'poems.html';
+    }
   });
 
   // Draft save

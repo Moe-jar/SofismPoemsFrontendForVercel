@@ -31,28 +31,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     else window.location.href = 'pages/poems.html';
   });
 
-  // Load current poem state
-  try {
-    const currentPoem = await currentApi.getPoem();
-    renderCurrentPoem(currentPoem);
-  } catch (err) {
-    console.warn('Could not load current poem:', err.message);
+  // Load current poem/wasla state and featured poems in parallel
+  const [poemResult, waslaResult, poemsResult] = await Promise.allSettled([
+    currentApi.getPoem(),
+    currentApi.getWasla(),
+    poemsApi.getAll({ page: 1, pageSize: 3 }),
+  ]);
+
+  if (poemResult.status === 'fulfilled') {
+    renderCurrentPoem(poemResult.value);
+  } else {
+    console.warn('Could not load current poem:', poemResult.reason?.message);
   }
 
-  // Load current wasla state
-  try {
-    const currentWasla = await currentApi.getWasla();
-    renderCurrentWasla(currentWasla);
-  } catch (err) {
-    console.warn('Could not load current wasla:', err.message);
+  if (waslaResult.status === 'fulfilled') {
+    renderCurrentWasla(waslaResult.value);
+  } else {
+    console.warn('Could not load current wasla:', waslaResult.reason?.message);
   }
 
-  // Load featured poems
-  try {
-    const result = await poemsApi.getAll({ page: 1, pageSize: 3 });
-    renderFeaturedPoems(result?.items || []);
-  } catch (err) {
-    console.warn('Could not load featured poems:', err.message);
+  if (poemsResult.status === 'fulfilled') {
+    renderFeaturedPoems(poemsResult.value?.items || []);
+  } else {
+    console.warn('Could not load featured poems:', poemsResult.reason?.message);
   }
 });
 

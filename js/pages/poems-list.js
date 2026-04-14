@@ -216,6 +216,33 @@ function setupCardActions(container) {
     });
   });
 
+  // Bookmark toggle
+  container.querySelectorAll('.bookmark-btn').forEach(btn => {
+    const id = btn.dataset.id;
+    const bookmarks = JSON.parse(localStorage.getItem('divan_bookmarks') || '[]');
+    const icon = btn.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = bookmarks.includes(id) ? 'bookmark' : 'bookmark_border';
+    if (bookmarks.includes(id)) btn.style.color = '#d4b068';
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const saved = JSON.parse(localStorage.getItem('divan_bookmarks') || '[]');
+      const idx = saved.indexOf(id);
+      if (idx === -1) {
+        saved.push(id);
+        if (icon) icon.textContent = 'bookmark';
+        btn.style.color = '#d4b068';
+        showToast('تم حفظ القصيدة في الإشارات المرجعية', 'success');
+      } else {
+        saved.splice(idx, 1);
+        if (icon) icon.textContent = 'bookmark_border';
+        btn.style.color = '';
+        showToast('تم إزالة القصيدة من الإشارات المرجعية', 'info');
+      }
+      localStorage.setItem('divan_bookmarks', JSON.stringify(saved));
+    });
+  });
+
   // Share poem
   container.querySelectorAll('.share-poem-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {

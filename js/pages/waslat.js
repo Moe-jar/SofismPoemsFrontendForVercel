@@ -27,8 +27,9 @@ async function loadWaslat() {
   showLoading('waslatContainer', 'جاري تحميل الوصلات...');
 
   try {
-    waslat = await waslatApi.getAll();
-    if (!waslat?.length) {
+    const result = await waslatApi.getAll();
+    waslat = result?.items || result || [];
+    if (!waslat.length) {
       showEmpty('waslatContainer', 'لا توجد وصلات بعد. أنشئ وصلتك الأولى!', 'queue_music');
       return;
     }
@@ -140,7 +141,7 @@ async function openWaslaDetail(waslaId) {
   document.getElementById('closeWaslaModal')?.addEventListener('click', () => {
     modal.classList.add('hidden');
     selectedWaslaId = null;
-  });
+  }, { once: true });
 
   // Backdrop click
   modal.onclick = (e) => {
