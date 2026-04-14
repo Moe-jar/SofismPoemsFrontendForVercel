@@ -83,6 +83,12 @@ function getLoginPath() {
 
 // ─── Auth API (local simulation — backend has no auth endpoints) ──────────────
 // The admin username recognised by the backend is "kurdi" (sets current poem).
+function _randomHex(bytes = 16) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export const authApi = {
   login: (username, password) => {
     const uname = (username || '').trim().toLowerCase();
@@ -91,7 +97,7 @@ export const authApi = {
     }
     const isAdmin = uname === 'kurdi';
     return Promise.resolve({
-      token:    `local-${uname}-${Date.now()}`,
+      token:    _randomHex(32),
       userId:   isAdmin ? 1 : 2,
       fullName: isAdmin ? 'المسؤول' : username,
       username: uname,
@@ -260,8 +266,19 @@ export const currentApi = {
   },
 
   // Backend: POST /api/Boems/AddToCurrent?id={id}&AdminUserName=kurdi
-  sharePoem: (poemId) =>
-    apiFetch(`/api/Boems/AddToCurrent?id=${poemId}&AdminUserName=kurdi`, { method: 'POST' }),
+  // poemId is validated as a positive integer; admin username is taken from the current session.
+  sharePoem: (poemId) => {
+    const id = parseInt(poemId, 10);
+    if (!Number.isInteger(id) || id < 1) {
+      return Promise.reject(new Error('معرّف القصيدة غير صالح'));
+    }
+    const user = JSON.parse(localStorage.getItem('divan_user') || 'null');
+    const adminName = (user?.username || '').toLowerCase();
+    return apiFetch(
+      `/api/Boems/AddToCurrent?id=${id}&AdminUserName=${encodeURIComponent(adminName)}`,
+      { method: 'POST' },
+    );
+  },
 
   getWasla: async () => {
     try {
