@@ -217,12 +217,12 @@ function setupCardActions(container) {
   });
 
   // Bookmark toggle
+  const initialBookmarks = JSON.parse(localStorage.getItem('divan_bookmarks') || '[]');
   container.querySelectorAll('.bookmark-btn').forEach(btn => {
     const id = btn.dataset.id;
-    const bookmarks = JSON.parse(localStorage.getItem('divan_bookmarks') || '[]');
     const icon = btn.querySelector('.material-symbols-outlined');
-    if (icon) icon.textContent = bookmarks.includes(id) ? 'bookmark' : 'bookmark_border';
-    if (bookmarks.includes(id)) btn.style.color = '#d4b068';
+    if (icon) icon.textContent = initialBookmarks.includes(id) ? 'bookmark' : 'bookmark_border';
+    if (initialBookmarks.includes(id)) btn.style.color = '#d4b068';
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
