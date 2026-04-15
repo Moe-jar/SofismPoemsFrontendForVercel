@@ -101,18 +101,81 @@ function syncCategoryUI() {
   });
 }
 
-function syncHadraSectionFilter() {
-  const group = document.getElementById("hadraSectionFilterGroup");
-  const select = document.getElementById("hadraSectionFilter");
+function syncHadraDropdownUI() {
+  const btn = document.getElementById("hadraDropdownBtn");
+  const labelEl = document.getElementById("hadraDropdownLabel");
   const isHadra = filters.category === "Hadra";
 
-  if (group) group.classList.toggle("hidden", !isHadra);
-  if (!isHadra) {
-    filters.hadraSection = "";
-    if (select) select.value = "";
-    return;
+  if (btn) btn.classList.toggle("active-category", isHadra);
+
+  const sectionLabel =
+    (filters.hadraSection &&
+      (HADRA_SECTION_LABELS[filters.hadraSection] ||
+        filters.hadraSection)) ||
+    "";
+  if (labelEl) {
+    labelEl.textContent = sectionLabel ? `حضرة - ${sectionLabel}` : "حضرة";
   }
-  if (select) select.value = filters.hadraSection || "";
+
+  document.querySelectorAll("[data-hadra-section]").forEach((option) => {
+    const section = option.dataset.hadraSection || "";
+    const isActive =
+      isHadra && (filters.hadraSection || "") === (section || "");
+    option.classList.toggle("hadra-option-active", isActive);
+  });
+}
+
+function closeHadraDropdown() {
+  const menu = document.getElementById("hadraDropdownMenu");
+  const btn = document.getElementById("hadraDropdownBtn");
+  if (menu) menu.classList.add("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function setupHadraDropdown() {
+  const btn = document.getElementById("hadraDropdownBtn");
+  const menu = document.getElementById("hadraDropdownMenu");
+  if (!btn || !menu) return;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = !menu.classList.contains("hidden");
+    if (isOpen) {
+      closeHadraDropdown();
+      return;
+    }
+    menu.classList.remove("hidden");
+    btn.setAttribute("aria-expanded", "true");
+  });
+
+  menu.querySelectorAll("[data-hadra-section]").forEach((option) => {
+    option.addEventListener("click", () => {
+      const section = option.dataset.hadraSection || "";
+      setCategory("Hadra", section);
+      closeHadraDropdown();
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+      closeHadraDropdown();
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeHadraDropdown();
+  });
+}
+
+function setCategory(category, hadraSection = "") {
+  filters.category = category || "";
+  filters.hadraSection =
+    filters.category === "Hadra" ? hadraSection || "" : "";
+  syncCategoryUI();
+  syncHadraDropdownUI();
+  closeHadraDropdown();
+  currentPage = 1;
+  loadPoems();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -123,6 +186,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   setupAddToWaslaModal();
+  setupHadraDropdown();
 
   // Load filters data
   await Promise.allSettled([loadPoets(), loadMaqamat()]);
@@ -132,6 +196,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   filters.q = params.get("q") || "";
   filters.category = params.get("category") || "";
   filters.hadraSection = params.get("hadraSection") || "";
+  if (filters.category !== "Hadra") {
+    filters.hadraSection = "";
+  }
 
   const searchInput = document.getElementById("searchInput");
   if (searchInput && filters.q) searchInput.value = filters.q;
@@ -166,23 +233,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadPoems();
   });
 
-  document
-    .getElementById("hadraSectionFilter")
-    ?.addEventListener("change", (e) => {
-      filters.hadraSection = e.target.value;
-      currentPage = 1;
-      loadPoems();
-    });
-
   // Category buttons
   document.querySelectorAll("[data-category]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const cat = btn.dataset.category;
-      filters.category = filters.category === cat ? "" : cat;
-      syncCategoryUI();
-      syncHadraSectionFilter();
-      currentPage = 1;
-      loadPoems();
+      const nextCategory = filters.category === cat ? "" : cat;
+      setCategory(nextCategory, "");
     });
   });
 
@@ -192,7 +248,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   syncCategoryUI();
-  syncHadraSectionFilter();
+  syncHadraDropdownUI();
   await loadPoems();
 });
 

@@ -1,7 +1,8 @@
 // Authentication utilities for ديوان الصوفية
+import "./theme.js";
 
-const TOKEN_KEY = 'divan_token';
-const USER_KEY = 'divan_user';
+const TOKEN_KEY = "divan_token";
+const USER_KEY = "divan_user";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -9,7 +10,11 @@ export function getToken() {
 
 export function getUser() {
   const u = localStorage.getItem(USER_KEY);
-  try { return u ? JSON.parse(u) : null; } catch { return null; }
+  try {
+    return u ? JSON.parse(u) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function setAuth(token, user) {
@@ -28,10 +33,10 @@ export function isLoggedIn() {
 
 export function isLead() {
   const u = getUser();
-  return u && u.role === 'LeadMunshid';
+  return u && u.role === "LeadMunshid";
 }
 
-export function requireAuth(redirectTo = '../login.html') {
+export function requireAuth(redirectTo = "../login.html") {
   if (!isLoggedIn()) {
     window.location.href = redirectTo;
     return false;
@@ -39,7 +44,7 @@ export function requireAuth(redirectTo = '../login.html') {
   return true;
 }
 
-export function requireLead(redirectTo = '../index.html') {
+export function requireLead(redirectTo = "../index.html") {
   if (!isLead()) {
     window.location.href = redirectTo;
     return false;
@@ -49,5 +54,5 @@ export function requireLead(redirectTo = '../index.html') {
 
 export function logout() {
   clearAuth();
-  window.location.href = '../login.html';
+  window.location.href = "../login.html";
 }

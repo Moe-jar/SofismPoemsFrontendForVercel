@@ -57,6 +57,23 @@
           <div class="w-full flex items-center justify-between">
             <div id="userBadgeContainer"></div>
             <div class="flex items-center gap-3">
+              <button
+                id="themeToggle"
+                class="theme-toggle"
+                type="button"
+                aria-pressed="false"
+                aria-label="تبديل النمط"
+              >
+                <span class="theme-toggle-track" aria-hidden="true">
+                  <span class="theme-toggle-thumb"></span>
+                </span>
+                <span class="theme-toggle-label">
+                  <span id="themeToggleIcon" class="material-symbols-outlined"
+                    >dark_mode</span
+                  >
+                  <span id="themeToggleText">وضع ليلي</span>
+                </span>
+              </button>
               <a
                 href="pages/poems.html"
                 class="p-2 rounded-full hover:bg-white/5 transition-colors text-[#9db8b6] hover:text-white"

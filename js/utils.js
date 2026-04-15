@@ -26,7 +26,7 @@ export const CATEGORY_LABELS = {
 
 // Hadra section labels
 export const HADRA_SECTION_LABELS = {
-  Matali: "الافتتاح",
+  Matali: "مطلع",
   Qiyam: "القيام",
   Ruku: "ركوع",
 };
