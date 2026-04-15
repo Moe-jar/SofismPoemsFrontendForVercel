@@ -170,7 +170,7 @@ async function loadPoems() {
       query: filters.q || undefined,
       poetId: filters.poetId || undefined,
       maqamId: filters.maqamId || undefined,
-      category: filters.category || undefined,
+      category: filters.category,
     });
 
     const poems = result?.items || result || [];
