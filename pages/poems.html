@@ -418,6 +418,34 @@
                   </div>
                 </div>
               </div>
+              <!-- Hadra section filter (visible when Hadra is selected) -->
+              <div
+                id="hadraSectionFilterGroup"
+                class="relative flex-1 min-w-[130px] hidden"
+              >
+                <label
+                  class="block text-[#9db8b6] text-xs font-medium mb-1.5 px-1"
+                  >قسم الحضرة</label
+                >
+                <div class="relative">
+                  <select
+                    id="hadraSectionFilter"
+                    class="w-full appearance-none bg-[#1c2626] border border-[#3c5351] text-white rounded-xl px-4 py-3 pr-10 focus:outline-none focus:border-primary-light transition-all text-sm cursor-pointer"
+                  >
+                    <option value="">كل أقسام الحضرة</option>
+                    <option value="Matali">الافتتاح</option>
+                    <option value="Qiyam">القيام</option>
+                    <option value="Ruku">ركوع</option>
+                  </select>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#9db8b6]"
+                  >
+                    <span class="material-symbols-outlined text-lg"
+                      >groups</span
+                    >
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Category chips -->

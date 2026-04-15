@@ -31,28 +31,57 @@
 }
 
 /* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #121616; }
-::-webkit-scrollbar-thumb { background: #293837; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #0a5750; }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #121616;
+}
+::-webkit-scrollbar-thumb {
+  background: #293837;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0a5750;
+}
 
 /* Background animation */
 @keyframes float-orb {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  33%       { transform: translateY(-20px) rotate(120deg); }
-  66%       { transform: translateY(10px) rotate(240deg); }
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-20px) rotate(120deg);
+  }
+  66% {
+    transform: translateY(10px) rotate(240deg);
+  }
 }
 
-.animate-float { animation: float-orb 12s ease-in-out infinite; }
-.animate-float-delay { animation: float-orb 12s ease-in-out infinite 4s; }
+.animate-float {
+  animation: float-orb 12s ease-in-out infinite;
+}
+.animate-float-delay {
+  animation: float-orb 12s ease-in-out infinite 4s;
+}
 
 /* Page fade-in */
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.fade-in-up { animation: fade-in-up 0.5s ease-out forwards; }
+.fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
 
 /* Glow text */
 .text-glow {
@@ -90,19 +119,50 @@
 }
 
 /* Category badge colors */
-.badge-ilahiyat { background: rgba(10,87,80,0.3); border-color: rgba(21,140,130,0.4); color: #4ecdc4; }
-.badge-nabawiyat { background: rgba(140,126,21,0.3); border-color: rgba(140,126,21,0.4); color: #d4c34a; }
-.badge-hadra { background: rgba(90,21,140,0.3); border-color: rgba(90,21,140,0.4); color: #c44ae8; }
-.badge-mufrad { background: rgba(42,140,21,0.3); border-color: rgba(42,140,21,0.4); color: #60d44a; }
+.badge-ilahiyat {
+  background: rgba(10, 87, 80, 0.3);
+  border-color: rgba(21, 140, 130, 0.4);
+  color: #4ecdc4;
+}
+.badge-nabawiyat {
+  background: rgba(140, 126, 21, 0.3);
+  border-color: rgba(140, 126, 21, 0.4);
+  color: #d4c34a;
+}
+.badge-hadra {
+  background: rgba(90, 21, 140, 0.3);
+  border-color: rgba(90, 21, 140, 0.4);
+  color: #c44ae8;
+}
+.badge-mufrad {
+  background: rgba(42, 140, 21, 0.3);
+  border-color: rgba(42, 140, 21, 0.4);
+  color: #60d44a;
+}
+
+.active-category {
+  box-shadow:
+    0 0 0 1px rgba(21, 140, 130, 0.45),
+    0 8px 18px rgba(10, 87, 80, 0.25);
+}
 
 /* Loading skeleton */
 @keyframes shimmer {
-  from { background-position: -200% 0; }
-  to   { background-position: 200% 0; }
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 0.5rem;
@@ -134,9 +194,11 @@
   border-radius: 0.75rem;
   text-decoration: none;
   color: rgba(255, 255, 255, 0.5);
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
   font-size: 0.65rem;
-  font-family: 'Cairo', sans-serif;
+  font-family: "Cairo", sans-serif;
   font-weight: 600;
 }
 
@@ -149,7 +211,9 @@
 }
 
 /* Toast container styles (injected from ui.js) */
-.toast-icon { font-size: 1.1rem; }
+.toast-icon {
+  font-size: 1.1rem;
+}
 
 /* Form validation states */
 .input-error {
@@ -162,13 +226,22 @@
 }
 
 /* Smooth drag-and-drop */
-.dragging { opacity: 0.5; }
-.drag-over { border: 2px dashed rgba(21,140,130,0.5); }
+.dragging {
+  opacity: 0.5;
+}
+.drag-over {
+  border: 2px dashed rgba(21, 140, 130, 0.5);
+}
 
 /* Progress bar animation */
 @keyframes progress-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(16,185,129,0.3); }
-  50%       { box-shadow: 0 0 16px rgba(16,185,129,0.6); }
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.6);
+  }
 }
 
 .progress-bar-inner {
@@ -177,7 +250,14 @@
 
 /* Bounce slow animation */
 @keyframes bounce-slow {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-6px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
-.animate-bounce-slow { animation: bounce-slow 3s infinite; }
+.animate-bounce-slow {
+  animation: bounce-slow 3s infinite;
+}

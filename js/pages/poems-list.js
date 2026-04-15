@@ -15,6 +15,7 @@ import {
   getPoemMaqamName,
   getPoemPoetName,
   CATEGORY_LABELS,
+  HADRA_SECTION_LABELS,
 } from "../utils.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
@@ -22,7 +23,13 @@ if (!requireAuth()) throw new Error("Not authenticated");
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
-let filters = { q: "", poetId: "", maqamId: "", category: "" };
+let filters = {
+  q: "",
+  poetId: "",
+  maqamId: "",
+  category: "",
+  hadraSection: "",
+};
 const poetNameById = new Map();
 const maqamNameById = new Map();
 let selectedPoemId = null;
@@ -37,6 +44,75 @@ function extractId(value) {
   if (typeof value === "string" || typeof value === "number") return value;
   if (typeof value === "object") return value.id ?? value.value ?? null;
   return null;
+}
+
+function extractHadraSectionValue(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    return (
+      value.code ||
+      value.key ||
+      value.value ||
+      value.name ||
+      value.label ||
+      value.title ||
+      ""
+    )
+      .toString()
+      .trim();
+  }
+  return String(value).trim();
+}
+
+function getHadraSectionLabel(poem) {
+  const raw =
+    poem?.hadraSection ??
+    poem?.hadra_section ??
+    poem?.hadraSectionName ??
+    poem?.hadraSectionLabel ??
+    poem?.hadraSectionText ??
+    poem?.section ??
+    "";
+  const value = extractHadraSectionValue(raw);
+  if (!value) return "";
+
+  const aliases = {
+    Opening: "Matali",
+    Main: "Qiyam",
+    Closing: "Ruku",
+    Matali: "Matali",
+    Qiyam: "Qiyam",
+    Ruku: "Ruku",
+    matali: "Matali",
+    qiyam: "Qiyam",
+    ruku: "Ruku",
+  };
+
+  const normalized = aliases[value] || aliases[value.toLowerCase()] || value;
+  return HADRA_SECTION_LABELS[normalized] || value;
+}
+
+function syncCategoryUI() {
+  const activeCategory = filters.category;
+  document.querySelectorAll("[data-category]").forEach((btn) => {
+    const isActive = activeCategory && btn.dataset.category === activeCategory;
+    btn.classList.toggle("active-category", Boolean(isActive));
+  });
+}
+
+function syncHadraSectionFilter() {
+  const group = document.getElementById("hadraSectionFilterGroup");
+  const select = document.getElementById("hadraSectionFilter");
+  const isHadra = filters.category === "Hadra";
+
+  if (group) group.classList.toggle("hidden", !isHadra);
+  if (!isHadra) {
+    filters.hadraSection = "";
+    if (select) select.value = "";
+    return;
+  }
+  if (select) select.value = filters.hadraSection || "";
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -55,6 +131,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
   filters.q = params.get("q") || "";
   filters.category = params.get("category") || "";
+  filters.hadraSection = params.get("hadraSection") || "";
 
   const searchInput = document.getElementById("searchInput");
   if (searchInput && filters.q) searchInput.value = filters.q;
@@ -89,15 +166,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadPoems();
   });
 
+  document
+    .getElementById("hadraSectionFilter")
+    ?.addEventListener("change", (e) => {
+      filters.hadraSection = e.target.value;
+      currentPage = 1;
+      loadPoems();
+    });
+
   // Category buttons
   document.querySelectorAll("[data-category]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document
-        .querySelectorAll("[data-category]")
-        .forEach((b) => b.classList.remove("active-category"));
       const cat = btn.dataset.category;
       filters.category = filters.category === cat ? "" : cat;
-      if (filters.category) btn.classList.add("active-category");
+      syncCategoryUI();
+      syncHadraSectionFilter();
       currentPage = 1;
       loadPoems();
     });
@@ -108,6 +191,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.href = "add-poem.html";
   });
 
+  syncCategoryUI();
+  syncHadraSectionFilter();
   await loadPoems();
 });
 
@@ -170,7 +255,11 @@ async function loadPoems() {
       query: filters.q || undefined,
       poetId: filters.poetId || undefined,
       maqamId: filters.maqamId || undefined,
-      category: filters.category,
+      category: filters.category || undefined,
+      hadraSection:
+        filters.category === "Hadra"
+          ? filters.hadraSection || undefined
+          : undefined,
     });
 
     const poems = result?.items || result || [];
@@ -220,6 +309,8 @@ function buildPoemCard(poem) {
         text: "#4ecdc4",
       };
   const categoryLabel = CATEGORY_LABELS[poem.category] || poem.category || "";
+  const hadraSectionLabel = getHadraSectionLabel(poem);
+  const isHadra = String(poem.category || "").toLowerCase() === "hadra";
   const lead = isLead();
 
   return `
@@ -247,6 +338,13 @@ function buildPoemCard(poem) {
                 ? `
               <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/5
                 border border-white/10 text-[#9db8b6] text-xs">${escapeHtml(categoryLabel)}</span>`
+                : ""
+            }
+            ${
+              isHadra && hadraSectionLabel
+                ? `
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/5
+                border border-white/10 text-[#c9a5ea] text-xs">${escapeHtml(hadraSectionLabel)}</span>`
                 : ""
             }
           </div>
