@@ -34,6 +34,8 @@ html[data-theme="dark"] {
   --theme-ring-shadow: rgba(10, 87, 80, 0.28);
   --theme-font-display: "Cairo", "Manrope", sans-serif;
   --theme-font-serif: "Amiri", serif;
+  --theme-font-poem: "Scheherazade New", "Amiri", "Noto Naskh Arabic", serif;
+  --theme-font-arabic-ui: "Noto Sans Arabic", "Cairo", sans-serif;
   --theme-letter-spacing: 0;
   --theme-nav-item: rgba(248, 252, 251, 0.56);
   --theme-nav-active: #19a59b;
@@ -77,6 +79,8 @@ html[data-theme="light"] {
   --theme-ring-shadow: rgba(30, 44, 43, 0.1);
   --theme-font-display: "Cairo", "Manrope", sans-serif;
   --theme-font-serif: "Amiri", serif;
+  --theme-font-poem: "Scheherazade New", "Amiri", "Noto Naskh Arabic", serif;
+  --theme-font-arabic-ui: "Noto Sans Arabic", "Cairo", sans-serif;
   --theme-letter-spacing: 0;
   --theme-nav-item: rgba(30, 44, 43, 0.65);
   --theme-nav-active: #0d6a63;
@@ -110,6 +114,32 @@ body {
 
 .font-serif {
   font-family: var(--theme-font-serif) !important;
+}
+
+.font-poem {
+  font-family: var(--theme-font-poem) !important;
+  font-weight: 500;
+  font-variant-ligatures: common-ligatures contextual;
+  font-feature-settings:
+    "liga" 1,
+    "calt" 1,
+    "kern" 1;
+}
+
+.font-arabic-ui {
+  font-family: var(--theme-font-arabic-ui) !important;
+}
+
+#poemBody {
+  font-family: var(--theme-font-poem) !important;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0;
+  word-spacing: 0.02em;
+}
+
+#poemBody .verse-item,
+#poemBody > .group {
+  text-wrap: pretty;
 }
 
 html[data-theme] a,

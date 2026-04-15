@@ -23,6 +23,8 @@ let waslat = [];
 let selectedWaslaId = null;
 const poetNameById = new Map();
 const maqamNameById = new Map();
+const shouldOpenCurrentWasla =
+  new URLSearchParams(window.location.search).get("openCurrent") === "1";
 
 function getNameFromMap(map, id) {
   if (id === null || id === undefined || id === "") return "";
@@ -107,7 +109,38 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Load waslat list
   await loadWaslat();
+
+  if (shouldOpenCurrentWasla) {
+    await openCurrentWaslaFromQuery();
+  }
 });
+
+async function openCurrentWaslaFromQuery() {
+  clearOpenCurrentWaslaQueryParam();
+
+  try {
+    const state = await currentApi.getWasla();
+    const currentWaslaId = state?.wasla?.id;
+
+    if (!currentWaslaId) {
+      showToast("لا توجد وصلة حالية الآن", "info");
+      return;
+    }
+
+    await openWaslaDetail(currentWaslaId);
+  } catch {
+    showToast("تعذر فتح الوصلة الحالية", "error");
+  }
+}
+
+function clearOpenCurrentWaslaQueryParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("openCurrent")) return;
+
+  url.searchParams.delete("openCurrent");
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState({}, "", nextUrl);
+}
 
 async function loadPoets() {
   try {
