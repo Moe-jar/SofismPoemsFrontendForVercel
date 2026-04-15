@@ -2,7 +2,7 @@
 import { requireAuth, isLead } from "../auth.js";
 import { currentApi } from "../api.js";
 import { showToast } from "../ui.js";
-import { escapeHtml, CATEGORY_LABELS } from "../utils.js";
+import { escapeHtml, getPoemMaqamName, getPoemPoetName } from "../utils.js";
 import { startPolling, stopPolling, on } from "../signalr.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
@@ -73,12 +73,14 @@ function renderPoem(state) {
   const maqamEl = document.getElementById("poemMaqam");
   const sharedByEl = document.getElementById("sharedBy");
   const sharedAtEl = document.getElementById("sharedAt");
+  const poetName = getPoemPoetName(poem);
+  const maqamName = getPoemMaqamName(poem);
 
   if (titleEl) titleEl.textContent = poem.title || "";
-  if (poetEl) poetEl.textContent = poem.poetName || "";
+  if (poetEl) poetEl.textContent = poetName || "";
   if (maqamEl) {
-    maqamEl.textContent = poem.maqamName || "";
-    maqamEl.closest(".maqam-pill")?.classList.toggle("hidden", !poem.maqamName);
+    maqamEl.textContent = maqamName || "";
+    maqamEl.closest(".maqam-pill")?.classList.toggle("hidden", !maqamName);
   }
   if (sharedByEl) sharedByEl.textContent = state.sharedByName || "";
   if (sharedAtEl && state.sharedAt) {

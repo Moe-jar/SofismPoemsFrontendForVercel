@@ -12,6 +12,8 @@ import {
   debounce,
   escapeHtml,
   getMaqamColor,
+  getPoemMaqamName,
+  getPoemPoetName,
   CATEGORY_LABELS,
 } from "../utils.js";
 
@@ -21,6 +23,21 @@ let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
 let filters = { q: "", poetId: "", maqamId: "", category: "" };
+const poetNameById = new Map();
+const maqamNameById = new Map();
+let selectedPoemId = null;
+
+function getNameFromMap(map, id) {
+  if (id === null || id === undefined || id === "") return "";
+  return map.get(String(id)) || "";
+}
+
+function extractId(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" || typeof value === "number") return value;
+  if (typeof value === "object") return value.id ?? value.value ?? null;
+  return null;
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (isLead()) {
@@ -28,6 +45,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       .querySelectorAll(".lead-only")
       .forEach((el) => el.classList.remove("hidden"));
   }
+
+  setupAddToWaslaModal();
 
   // Load filters data
   await Promise.allSettled([loadPoets(), loadMaqamat()]);
@@ -97,6 +116,13 @@ async function loadPoets() {
   if (!select) return;
   try {
     const poets = await poetsApi.getAll();
+    poetNameById.clear();
+    poets.forEach((p) => {
+      const name = p.nameAr || p.nameEn || p.name || "";
+      if (p.id !== null && p.id !== undefined && name) {
+        poetNameById.set(String(p.id), name);
+      }
+    });
     select.innerHTML =
       `<option value="">جميع الشعراء</option>` +
       poets
@@ -113,6 +139,13 @@ async function loadMaqamat() {
   if (!select) return;
   try {
     const maqamat = await maqamatApi.getAll();
+    maqamNameById.clear();
+    maqamat.forEach((m) => {
+      const name = m.nameAr || m.nameEn || m.name || "";
+      if (m.id !== null && m.id !== undefined && name) {
+        maqamNameById.set(String(m.id), name);
+      }
+    });
     select.innerHTML =
       `<option value="">جميع المقامات</option>` +
       maqamat
@@ -163,8 +196,24 @@ async function loadPoems() {
 }
 
 function buildPoemCard(poem) {
-  const maqamColor = poem.maqamName
-    ? getMaqamColor(poem.maqamName)
+  let maqamName = getPoemMaqamName(poem);
+  if (!maqamName) {
+    const maqamId =
+      poem?.maqamId ??
+      poem?.maqamID ??
+      poem?.maqam_id ??
+      extractId(poem?.maqam);
+    maqamName = getNameFromMap(maqamNameById, maqamId);
+  }
+
+  let poetName = getPoemPoetName(poem);
+  if (!poetName) {
+    const poetId =
+      poem?.poetId ?? poem?.poetID ?? poem?.poet_id ?? extractId(poem?.poet);
+    poetName = getNameFromMap(poetNameById, poetId);
+  }
+  const maqamColor = maqamName
+    ? getMaqamColor(maqamName)
     : {
         bg: "rgba(10,87,80,0.3)",
         border: "rgba(21,140,130,0.4)",
@@ -184,12 +233,12 @@ function buildPoemCard(poem) {
         <div class="flex-1 flex flex-col gap-2 min-w-0">
           <div class="flex flex-wrap items-center gap-2 mb-1">
             ${
-              poem.maqamName
+              maqamName
                 ? `
               <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tracking-wide"
                 style="background:${maqamColor.bg};border:1px solid ${maqamColor.border};color:${maqamColor.text};">
                 <span class="w-1.5 h-1.5 rounded-full" style="background:${maqamColor.text};"></span>
-                مقام ${escapeHtml(poem.maqamName)}
+                مقام ${escapeHtml(maqamName)}
               </span>`
                 : ""
             }
@@ -206,11 +255,11 @@ function buildPoemCard(poem) {
             ${escapeHtml(poem.title)}
           </h3>
           ${
-            poem.poetName
+            poetName
               ? `
             <p class="text-[#9db8b6] text-sm font-medium flex items-center gap-2 mt-1">
               <span class="material-symbols-outlined text-base opacity-70">edit</span>
-              ${escapeHtml(poem.poetName)}
+              ${escapeHtml(poetName)}
             </p>`
               : ""
           }
@@ -243,6 +292,12 @@ function buildPoemCard(poem) {
               data-id="${poem.id}" data-title="${escapeHtml(poem.title)}">
               <span class="material-symbols-outlined text-lg">podcasts</span>
               <span class="font-medium">عرض للجميع</span>
+            </button>
+            <button class="add-to-wasla-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+              bg-white/5 hover:bg-primary/20 hover:text-primary-light transition-colors text-[#9db8b6]"
+              data-id="${poem.id}" data-title="${escapeHtml(poem.title)}">
+              <span class="material-symbols-outlined text-lg">playlist_add</span>
+              <span class="font-medium">إضافة للوصلة</span>
             </button>
             <button class="edit-poem-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg
               bg-white/5 hover:bg-primary/20 hover:text-primary-light transition-colors text-[#9db8b6]"
@@ -317,6 +372,13 @@ function setupCardActions(container) {
     });
   });
 
+  container.querySelectorAll(".add-to-wasla-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openAddToWaslaModal(btn.dataset.id, btn.dataset.title);
+    });
+  });
+
   // Edit poem
   container.querySelectorAll(".edit-poem-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -343,6 +405,93 @@ function setupCardActions(container) {
       }
     });
   });
+}
+
+function setupAddToWaslaModal() {
+  const modal = document.getElementById("addToWaslaModal");
+  if (!modal) return;
+
+  document
+    .getElementById("closeAddToWaslaModal")
+    ?.addEventListener("click", closeAddToWaslaModal);
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeAddToWaslaModal();
+  });
+
+  document
+    .getElementById("confirmAddToWaslaBtn")
+    ?.addEventListener("click", async () => {
+      const select = document.getElementById("waslaSelect");
+      const waslaId = select?.value;
+      if (!selectedPoemId) {
+        showToast("اختر قصيدة أولاً", "warning");
+        return;
+      }
+      if (!waslaId) {
+        showToast("يرجى اختيار الوصلة", "warning");
+        return;
+      }
+      try {
+        await waslatApi.addItem(waslaId, { poemId: selectedPoemId });
+        showToast("تمت إضافة القصيدة للوصلة", "success");
+        closeAddToWaslaModal();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+}
+
+function openAddToWaslaModal(poemId, poemTitle) {
+  const modal = document.getElementById("addToWaslaModal");
+  if (!modal) return;
+  selectedPoemId = poemId;
+  const titleEl = document.getElementById("addToWaslaPoemTitle");
+  if (titleEl) {
+    titleEl.textContent = poemTitle ? `القصيدة: ${poemTitle}` : "";
+  }
+  modal.classList.remove("hidden");
+  loadWaslatOptions();
+}
+
+function closeAddToWaslaModal() {
+  const modal = document.getElementById("addToWaslaModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  selectedPoemId = null;
+}
+
+async function loadWaslatOptions() {
+  const select = document.getElementById("waslaSelect");
+  const hint = document.getElementById("waslaSelectHint");
+  const confirmBtn = document.getElementById("confirmAddToWaslaBtn");
+  if (!select) return;
+
+  select.disabled = true;
+  if (confirmBtn) confirmBtn.disabled = true;
+  select.innerHTML = `<option value="">جاري التحميل...</option>`;
+  if (hint) hint.textContent = "";
+
+  try {
+    const result = await waslatApi.getAll();
+    const items = result?.items || result || [];
+    if (!items.length) {
+      select.innerHTML = `<option value="">لا توجد وصلات</option>`;
+      if (hint) hint.textContent = "لا توجد وصلات بعد";
+      return;
+    }
+
+    select.innerHTML =
+      `<option value="">اختر الوصلة...</option>` +
+      items
+        .map((w) => `<option value="${w.id}">${escapeHtml(w.name)}</option>`)
+        .join("");
+    select.disabled = false;
+    if (confirmBtn) confirmBtn.disabled = false;
+  } catch (err) {
+    select.innerHTML = `<option value="">تعذر تحميل الوصلات</option>`;
+    if (hint) hint.textContent = err.message || "تعذر تحميل الوصلات";
+  }
 }
 
 function renderPagination() {

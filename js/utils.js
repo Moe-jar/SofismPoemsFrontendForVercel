@@ -89,12 +89,54 @@ export function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
+function extractDisplayName(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const name =
+      value.nameAr ||
+      value.nameEn ||
+      value.name ||
+      value.fullName ||
+      value.title ||
+      value.label ||
+      value.displayName ||
+      "";
+    return typeof name === "string" ? name.trim() : "";
+  }
+  return "";
+}
+
+export function getPoemPoetName(poem) {
+  return extractDisplayName(
+    poem?.poetName ||
+      poem?.poetNameAr ||
+      poem?.poetNameEn ||
+      poem?.poet_name ||
+      poem?.poetAr ||
+      poem?.poetEn ||
+      poem?.poet,
+  );
+}
+
+export function getPoemMaqamName(poem) {
+  return extractDisplayName(
+    poem?.maqamName ||
+      poem?.maqamNameAr ||
+      poem?.maqamNameEn ||
+      poem?.maqam_name ||
+      poem?.maqamAr ||
+      poem?.maqamEn ||
+      poem?.maqam,
+  );
+}
+
 // Build poem card HTML (for catalog/waslat pages)
 export function buildPoemCard(poem, options = {}) {
   const { showShare = false, showAddToWasla = false, basePath = "" } = options;
-  const maqamColor = poem.maqamName
-    ? getMaqamColor(poem.maqamName)
-    : MAQAM_COLORS[0];
+  const maqamName = getPoemMaqamName(poem);
+  const poetName = getPoemPoetName(poem);
+  const maqamColor = maqamName ? getMaqamColor(maqamName) : MAQAM_COLORS[0];
   const categoryLabel = CATEGORY_LABELS[poem.category] || poem.category || "";
 
   return `
@@ -107,12 +149,12 @@ export function buildPoemCard(poem, options = {}) {
         <div class="flex-1 flex flex-col gap-2">
           <div class="flex flex-wrap items-center gap-2 mb-1">
             ${
-              poem.maqamName
+              maqamName
                 ? `
               <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tracking-wide"
                 style="background:${maqamColor.bg};border:1px solid ${maqamColor.border};color:${maqamColor.text};">
                 <span class="w-1.5 h-1.5 rounded-full" style="background:${maqamColor.text};"></span>
-                مقام ${escapeHtml(poem.maqamName)}
+                مقام ${escapeHtml(maqamName)}
               </span>`
                 : ""
             }
@@ -129,11 +171,11 @@ export function buildPoemCard(poem, options = {}) {
             ${escapeHtml(poem.title)}
           </h3>
           ${
-            poem.poetName
+            poetName
               ? `
             <p class="text-[#9db8b6] text-sm font-medium flex items-center gap-2 mt-1">
               <span class="material-symbols-outlined text-base opacity-70">edit</span>
-              ${escapeHtml(poem.poetName)}
+              ${escapeHtml(poetName)}
             </p>`
               : ""
           }

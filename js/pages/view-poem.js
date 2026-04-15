@@ -5,6 +5,8 @@ import { showToast, showConfirm } from "../ui.js";
 import {
   escapeHtml,
   getParam,
+  getPoemMaqamName,
+  getPoemPoetName,
   CATEGORY_LABELS,
   HADRA_SECTION_LABELS,
 } from "../utils.js";
@@ -125,12 +127,14 @@ async function loadPoem() {
 
   try {
     poem = await poemsApi.getById(poemId);
+    const poetName = getPoemPoetName(poem);
+    const maqamName = getPoemMaqamName(poem);
 
     if (titleEl) titleEl.textContent = poem.title || "";
-    if (poetEl) poetEl.textContent = poem.poetName || "";
+    if (poetEl) poetEl.textContent = poetName || "";
     if (maqamEl) {
-      maqamEl.textContent = poem.maqamName || "";
-      maqamEl.parentElement?.classList.toggle("hidden", !poem.maqamName);
+      maqamEl.textContent = maqamName || "";
+      maqamEl.parentElement?.classList.toggle("hidden", !maqamName);
     }
     if (categoryEl) {
       categoryEl.textContent =
