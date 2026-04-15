@@ -18,7 +18,7 @@ const getApiBase = () => {
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1"
   ) {
-    return "http://localhost:5000"; // Local backend (use HTTP to avoid SSL cert issues)
+    return "https://localhost:7145"; // Local backend (use HTTP to avoid SSL cert issues)
   }
 
   // Production default
