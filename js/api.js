@@ -10,6 +10,7 @@ async function apiFetch(path, options = {}) {
   try {
     res = await fetch(API_BASE + path, { ...options, headers });
   } catch (err) {
+    if (err?.name === "AbortError") throw err;
     throw new Error("تعذر الاتصال بالخادم. تأكد من تشغيل الواجهة الخلفية.");
   }
 
@@ -74,7 +75,7 @@ export const maqamatApi = {
 
 // Poems API
 export const poemsApi = {
-  getAll: (params = {}) => {
+  getAll: (params = {}, requestOptions = {}) => {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([key, value]) => {
         if (value === undefined || value === null) return false;
@@ -82,7 +83,7 @@ export const poemsApi = {
         return true;
       }),
     );
-    return apiFetch(`/api/poems?${qs}`);
+    return apiFetch(`/api/poems?${qs}`, requestOptions);
   },
   getById: (id) => apiFetch(`/api/poems/${id}`),
   create: (data) =>
@@ -94,9 +95,10 @@ export const poemsApi = {
 
 // Waslat API
 export const waslatApi = {
-  getAll: (search) =>
+  getAll: (search, requestOptions = {}) =>
     apiFetch(
       `/api/waslat${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+      requestOptions,
     ),
   getById: (id) => apiFetch(`/api/waslat/${id}`),
   create: (data) =>

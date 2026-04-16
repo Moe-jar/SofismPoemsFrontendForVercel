@@ -18,10 +18,11 @@ const getApiBase = () => {
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1"
   ) {
-    return "https://localhost:7145"; // Local backend (use HTTP to avoid SSL cert issues)
+    return "https://diwan-sufi-api.onrender.com"; // Local backend (use HTTP to avoid SSL cert issues)
   }
 
   // Production default
+
   return "https://diwan-sufi-api.onrender.com";
 };
 

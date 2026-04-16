@@ -1,6 +1,6 @@
 // View poem page logic for ديوان الصوفية
 import { requireAuth, isLead } from "../auth.js";
-import { poemsApi, currentApi, waslatApi } from "../api.js";
+import { poemsApi, currentApi } from "../api.js";
 import { showToast, showConfirm } from "../ui.js";
 import {
   escapeHtml,
@@ -8,14 +8,13 @@ import {
   getPoemMaqamName,
   getPoemPoetName,
   CATEGORY_LABELS,
-  HADRA_SECTION_LABELS,
 } from "../utils.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
 
 const poemId = getParam("id");
 let poem = null;
-let readingProgress = 0;
+let progressFrameRequested = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!poemId) {
@@ -94,8 +93,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
   // Track reading progress on scroll
-  window.addEventListener("scroll", updateProgress);
+  window.addEventListener("scroll", requestProgressUpdate, { passive: true });
 });
+
+function requestProgressUpdate() {
+  if (progressFrameRequested) return;
+  progressFrameRequested = true;
+  window.requestAnimationFrame(() => {
+    progressFrameRequested = false;
+    updateProgress();
+  });
+}
 
 function updateBookmarkBtn(isBookmarked) {
   const btn = document.getElementById("bookmarkBtn");

@@ -1,7 +1,7 @@
 // Current wasla (live) page logic for ديوان الصوفية
 import { requireAuth, isLead } from "../auth.js";
 import { currentApi } from "../api.js";
-import { showToast, showEmpty } from "../ui.js";
+import { showEmpty } from "../ui.js";
 import { escapeHtml } from "../utils.js";
 import { startPolling, stopPolling, on } from "../signalr.js";
 
@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadCurrentWasla();
 
   on("currentWaslaUpdated", (state) => {
-    if (state?.wasla?.id !== lastWaslaId) loadCurrentWasla();
+    applyCurrentWaslaState(state);
   });
 
   startPolling(null, () => currentApi.getWasla());
@@ -32,27 +32,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 window.addEventListener("beforeunload", stopPolling);
 
 async function loadCurrentWasla() {
+  try {
+    const state = await currentApi.getWasla();
+    applyCurrentWaslaState(state);
+  } catch (err) {
+    console.warn("Could not load current wasla:", err.message);
+  }
+}
+
+function applyCurrentWaslaState(state) {
   const container = document.getElementById("waslaContainer");
   const noWasla = document.getElementById("noWaslaMessage");
 
-  try {
-    const state = await currentApi.getWasla();
+  if (!state?.wasla) {
+    lastWaslaId = null;
+    if (container) container.classList.add("hidden");
+    if (noWasla) noWasla.classList.remove("hidden");
+    return;
+  }
 
-    if (!state?.wasla) {
-      if (container) container.classList.add("hidden");
-      if (noWasla) noWasla.classList.remove("hidden");
-      return;
-    }
+  if (noWasla) noWasla.classList.add("hidden");
+  if (container) container.classList.remove("hidden");
 
-    if (noWasla) noWasla.classList.add("hidden");
-    if (container) container.classList.remove("hidden");
-
-    if (state.wasla.id !== lastWaslaId) {
-      lastWaslaId = state.wasla.id;
-      renderWasla(state);
-    }
-  } catch (err) {
-    console.warn("Could not load current wasla:", err.message);
+  if (state.wasla.id !== lastWaslaId) {
+    lastWaslaId = state.wasla.id;
+    renderWasla(state);
   }
 }
 

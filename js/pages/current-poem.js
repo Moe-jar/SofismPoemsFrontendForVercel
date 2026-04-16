@@ -1,13 +1,11 @@
 // Current poem (live) page logic for ديوان الصوفية
 import { requireAuth, isLead } from "../auth.js";
 import { currentApi } from "../api.js";
-import { showToast } from "../ui.js";
 import { escapeHtml, getPoemMaqamName, getPoemPoetName } from "../utils.js";
 import { startPolling, stopPolling, on } from "../signalr.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
 
-let currentPoem = null;
 let lastPoemId = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -27,9 +25,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Start polling for updates
   on("currentPoemUpdated", (state) => {
-    if (state?.poem?.id !== lastPoemId) {
-      loadCurrentPoem();
-    }
+    applyCurrentPoemState(state);
   });
 
   startPolling(() => currentApi.getPoem(), null);
@@ -39,28 +35,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 window.addEventListener("beforeunload", stopPolling);
 
 async function loadCurrentPoem() {
+  try {
+    const state = await currentApi.getPoem();
+    applyCurrentPoemState(state);
+  } catch (err) {
+    console.warn("Could not load current poem:", err.message);
+  }
+}
+
+function applyCurrentPoemState(state) {
   const container = document.getElementById("poemContainer");
   const noPoem = document.getElementById("noPoemMessage");
 
-  try {
-    const state = await currentApi.getPoem();
+  if (!state?.poem) {
+    lastPoemId = null;
+    if (container) container.classList.add("hidden");
+    if (noPoem) noPoem.classList.remove("hidden");
+    return;
+  }
 
-    if (!state?.poem) {
-      if (container) container.classList.add("hidden");
-      if (noPoem) noPoem.classList.remove("hidden");
-      return;
-    }
+  if (noPoem) noPoem.classList.add("hidden");
+  if (container) container.classList.remove("hidden");
 
-    if (noPoem) noPoem.classList.add("hidden");
-    if (container) container.classList.remove("hidden");
-
-    if (state.poem.id !== lastPoemId) {
-      lastPoemId = state.poem.id;
-      currentPoem = state.poem;
-      renderPoem(state);
-    }
-  } catch (err) {
-    console.warn("Could not load current poem:", err.message);
+  if (state.poem.id !== lastPoemId) {
+    lastPoemId = state.poem.id;
+    renderPoem(state);
   }
 }
 

@@ -14,6 +14,7 @@ import {
   getMaqamColor,
   getPoemMaqamName,
   getPoemPoetName,
+  normalizeArabic,
   CATEGORY_LABELS,
   HADRA_SECTION_LABELS,
 } from "../utils.js";
@@ -33,6 +34,28 @@ let filters = {
 const poetNameById = new Map();
 const maqamNameById = new Map();
 let selectedPoemId = null;
+let bookmarkedPoemIds = new Set();
+let poemsRequestController = null;
+let waslatOptionsRequestController = null;
+const POEMS_DB_NAME = "divan-poems-cache";
+const POEMS_STORE_NAME = "poems";
+const POEMS_CACHE_HYDRATED_KEY = "divan_poems_cache_hydrated_v1";
+const POEMS_HYDRATE_PAGE_SIZE = 200;
+const POEMS_HYDRATE_MAX_PAGES = 500;
+let poemsDbPromise = null;
+let poemsCacheLoaded = false;
+let poemsCache = [];
+const HADRA_SECTION_ALIASES = {
+  Opening: "Matali",
+  Main: "Qiyam",
+  Closing: "Ruku",
+  Matali: "Matali",
+  Qiyam: "Qiyam",
+  Ruku: "Ruku",
+  matali: "Matali",
+  qiyam: "Qiyam",
+  ruku: "Ruku",
+};
 
 function getNameFromMap(map, id) {
   if (id === null || id === undefined || id === "") return "";
@@ -77,20 +100,399 @@ function getHadraSectionLabel(poem) {
   const value = extractHadraSectionValue(raw);
   if (!value) return "";
 
-  const aliases = {
-    Opening: "Matali",
-    Main: "Qiyam",
-    Closing: "Ruku",
-    Matali: "Matali",
-    Qiyam: "Qiyam",
-    Ruku: "Ruku",
-    matali: "Matali",
-    qiyam: "Qiyam",
-    ruku: "Ruku",
-  };
-
-  const normalized = aliases[value] || aliases[value.toLowerCase()] || value;
+  const normalized =
+    HADRA_SECTION_ALIASES[value] ||
+    HADRA_SECTION_ALIASES[value.toLowerCase()] ||
+    value;
   return HADRA_SECTION_LABELS[normalized] || value;
+}
+
+function canUseIndexedDb() {
+  return typeof window !== "undefined" && "indexedDB" in window;
+}
+
+function openPoemsDb() {
+  if (!canUseIndexedDb()) return Promise.resolve(null);
+  if (poemsDbPromise) return poemsDbPromise;
+
+  poemsDbPromise = new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(POEMS_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(POEMS_STORE_NAME)) {
+        db.createObjectStore(POEMS_STORE_NAME, { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () =>
+      reject(request.error || new Error("تعذر فتح قاعدة IndexedDB"));
+  }).catch((err) => {
+    console.warn("IndexedDB unavailable:", err);
+    poemsDbPromise = null;
+    return null;
+  });
+
+  return poemsDbPromise;
+}
+
+function getPoemCacheKey(poemId) {
+  if (poemId === null || poemId === undefined || poemId === "") return null;
+  if (typeof poemId === "number") return poemId;
+
+  const value = String(poemId).trim();
+  if (!value) return null;
+
+  const numeric = Number(value);
+  if (!Number.isNaN(numeric) && String(numeric) === value) return numeric;
+  return value;
+}
+
+async function readCachedPoemsFromDb() {
+  const db = await openPoemsDb();
+  if (!db) return [];
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(POEMS_STORE_NAME, "readonly");
+    const store = tx.objectStore(POEMS_STORE_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = () =>
+      resolve(Array.isArray(request.result) ? request.result : []);
+    request.onerror = () =>
+      reject(request.error || new Error("تعذر قراءة القصائد من IndexedDB"));
+  });
+}
+
+async function upsertCachedPoemsInDb(poems) {
+  if (!Array.isArray(poems) || !poems.length) return;
+
+  const db = await openPoemsDb();
+  if (!db) return;
+
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(POEMS_STORE_NAME, "readwrite");
+    const store = tx.objectStore(POEMS_STORE_NAME);
+
+    poems.forEach((poem) => {
+      if (!poem || poem.id === null || poem.id === undefined) return;
+      store.put(poem);
+    });
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () =>
+      reject(tx.error || new Error("تعذر حفظ القصائد في IndexedDB"));
+    tx.onabort = () =>
+      reject(tx.error || new Error("تم إلغاء حفظ القصائد في IndexedDB"));
+  });
+}
+
+async function deleteCachedPoemFromDb(poemId) {
+  const key = getPoemCacheKey(poemId);
+  if (key === null) return;
+
+  const db = await openPoemsDb();
+  if (!db) return;
+
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(POEMS_STORE_NAME, "readwrite");
+    const store = tx.objectStore(POEMS_STORE_NAME);
+    store.delete(key);
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("تعذر تحديث IndexedDB"));
+    tx.onabort = () =>
+      reject(tx.error || new Error("تم إلغاء تحديث IndexedDB"));
+  });
+}
+
+async function ensurePoemsCacheLoaded() {
+  if (poemsCacheLoaded) return poemsCache;
+
+  try {
+    poemsCache = await readCachedPoemsFromDb();
+  } catch (err) {
+    console.warn("Could not load poems cache:", err);
+    poemsCache = [];
+  }
+
+  poemsCacheLoaded = true;
+  return poemsCache;
+}
+
+function mergePoemsInMemory(poems) {
+  if (!Array.isArray(poems) || !poems.length) return;
+
+  const byId = new Map(
+    poemsCache
+      .filter((poem) => poem && poem.id !== null && poem.id !== undefined)
+      .map((poem) => [String(poem.id), poem]),
+  );
+
+  poems.forEach((poem) => {
+    if (!poem || poem.id === null || poem.id === undefined) return;
+    byId.set(String(poem.id), poem);
+  });
+
+  poemsCache = Array.from(byId.values());
+  poemsCacheLoaded = true;
+}
+
+function normalizePoemsResponse(result) {
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.items)) return result.items;
+  return [];
+}
+
+function isPoemsCacheHydrated() {
+  try {
+    return localStorage.getItem(POEMS_CACHE_HYDRATED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markPoemsCacheHydrated() {
+  try {
+    localStorage.setItem(POEMS_CACHE_HYDRATED_KEY, "1");
+  } catch {}
+}
+
+function getPoemPoetId(poem) {
+  return poem?.poetId ?? poem?.poetID ?? poem?.poet_id ?? extractId(poem?.poet);
+}
+
+function getPoemMaqamId(poem) {
+  return (
+    poem?.maqamId ?? poem?.maqamID ?? poem?.maqam_id ?? extractId(poem?.maqam)
+  );
+}
+
+function getPoemCategoryCode(poem) {
+  return String(
+    poem?.category ?? poem?.poemCategory ?? poem?.categoryCode ?? "",
+  ).trim();
+}
+
+function getPoemHadraSectionCode(poem) {
+  const raw =
+    poem?.hadraSection ??
+    poem?.hadra_section ??
+    poem?.hadraSectionName ??
+    poem?.hadraSectionLabel ??
+    poem?.hadraSectionText ??
+    poem?.section ??
+    "";
+  const value = extractHadraSectionValue(raw);
+  if (!value) return "";
+
+  return (
+    HADRA_SECTION_ALIASES[value] ||
+    HADRA_SECTION_ALIASES[value.toLowerCase()] ||
+    value
+  );
+}
+
+function normalizeSearchText(text) {
+  return normalizeArabic(String(text || "")).toLowerCase();
+}
+
+function poemMatchesFilters(poem, activeFilters) {
+  const selectedPoetId = String(activeFilters.poetId || "");
+  if (selectedPoetId) {
+    const poemPoetId = String(getPoemPoetId(poem) || "");
+    if (poemPoetId !== selectedPoetId) return false;
+  }
+
+  const selectedMaqamId = String(activeFilters.maqamId || "");
+  if (selectedMaqamId) {
+    const poemMaqamId = String(getPoemMaqamId(poem) || "");
+    if (poemMaqamId !== selectedMaqamId) return false;
+  }
+
+  const selectedCategory = String(activeFilters.category || "").toLowerCase();
+  if (selectedCategory) {
+    const poemCategory = getPoemCategoryCode(poem).toLowerCase();
+    if (poemCategory !== selectedCategory) return false;
+  }
+
+  if (selectedCategory === "hadra") {
+    const selectedHadraSection = String(
+      activeFilters.hadraSection || "",
+    ).toLowerCase();
+    if (selectedHadraSection) {
+      const poemHadraSection = getPoemHadraSectionCode(poem).toLowerCase();
+      if (poemHadraSection !== selectedHadraSection) return false;
+    }
+  }
+
+  const query = normalizeSearchText(activeFilters.q || "");
+  if (!query) return true;
+
+  const poemPoetName =
+    getPoemPoetName(poem) || getNameFromMap(poetNameById, getPoemPoetId(poem));
+  const poemMaqamName =
+    getPoemMaqamName(poem) ||
+    getNameFromMap(maqamNameById, getPoemMaqamId(poem));
+
+  const searchableText = normalizeSearchText(
+    [
+      poem?.title,
+      poem?.body,
+      poem?.content,
+      poemPoetName,
+      poemMaqamName,
+      getPoemCategoryCode(poem),
+      getPoemHadraSectionCode(poem),
+    ].join(" "),
+  );
+
+  return searchableText.includes(query);
+}
+
+function filterPoemsLocally(poems, activeFilters) {
+  if (!Array.isArray(poems) || !poems.length) return [];
+  return poems.filter((poem) => poemMatchesFilters(poem, activeFilters));
+}
+
+function toPoemsQueryParams(activeFilters) {
+  return {
+    query: activeFilters.q || undefined,
+    poetId: activeFilters.poetId || undefined,
+    maqamId: activeFilters.maqamId || undefined,
+    category: activeFilters.category || undefined,
+    hadraSection:
+      activeFilters.category === "Hadra"
+        ? activeFilters.hadraSection || undefined
+        : undefined,
+  };
+}
+
+function paginatePoems(filteredPoems) {
+  const total = filteredPoems.length;
+  totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * pageSize;
+  const items = filteredPoems.slice(start, start + pageSize);
+  return { total, items };
+}
+
+function renderPoemsFromFilteredList(filteredPoems) {
+  const container = document.getElementById("poemsContainer");
+  if (!container) return;
+
+  const { total, items } = paginatePoems(filteredPoems);
+
+  const countEl = document.getElementById("poemsCount");
+  if (countEl) countEl.textContent = `${total} قصيدة`;
+
+  if (!items.length) {
+    showEmpty("poemsContainer", "لا توجد قصائد تطابق البحث", "search_off");
+    renderPagination();
+    return;
+  }
+
+  container.innerHTML = items.map((poem) => buildPoemCard(poem)).join("");
+  syncBookmarkButtons(container);
+  renderPagination();
+}
+
+async function fetchAndCachePoems(params, signal) {
+  const result = await poemsApi.getAll(params, { signal });
+  const fetchedPoems = normalizePoemsResponse(result);
+  if (!fetchedPoems.length) return [];
+
+  mergePoemsInMemory(fetchedPoems);
+
+  try {
+    await upsertCachedPoemsInDb(fetchedPoems);
+  } catch (err) {
+    console.warn("Could not persist poems cache:", err);
+  }
+
+  return fetchedPoems;
+}
+
+async function hydrateAllPoemsCache(signal) {
+  const collected = new Map();
+  let page = 1;
+  let fetchedPages = 0;
+  let hasMore = true;
+
+  while (hasMore && fetchedPages < POEMS_HYDRATE_MAX_PAGES) {
+    const result = await poemsApi.getAll(
+      {
+        page,
+        pageSize: POEMS_HYDRATE_PAGE_SIZE,
+      },
+      { signal },
+    );
+
+    const pagePoems = normalizePoemsResponse(result);
+    pagePoems.forEach((poem) => {
+      if (!poem || poem.id === null || poem.id === undefined) return;
+      collected.set(String(poem.id), poem);
+    });
+
+    fetchedPages += 1;
+
+    if (Array.isArray(result) || !Array.isArray(result?.items)) {
+      hasMore = false;
+      break;
+    }
+
+    const declaredTotalPages = Number(result.totalPages || 0);
+    const declaredTotalCount = Number(result.totalCount || 0);
+
+    if (declaredTotalPages > 0) {
+      hasMore = page < declaredTotalPages;
+      page += 1;
+      continue;
+    }
+
+    if (declaredTotalCount > 0) {
+      const computedTotalPages = Math.ceil(
+        declaredTotalCount / POEMS_HYDRATE_PAGE_SIZE,
+      );
+      hasMore = page < computedTotalPages;
+      page += 1;
+      continue;
+    }
+
+    hasMore = pagePoems.length >= POEMS_HYDRATE_PAGE_SIZE;
+    page += 1;
+  }
+
+  const allPoems = Array.from(collected.values());
+  poemsCache = allPoems;
+  poemsCacheLoaded = true;
+
+  try {
+    await upsertCachedPoemsInDb(allPoems);
+  } catch (err) {
+    console.warn("Could not persist hydrated poems cache:", err);
+  }
+
+  markPoemsCacheHydrated();
+  return allPoems;
+}
+
+async function removePoemFromLocalCache(poemId) {
+  const normalizedId = String(poemId || "").trim();
+  if (!normalizedId) return;
+
+  poemsCache = poemsCache.filter(
+    (poem) => String(poem?.id ?? "") !== normalizedId,
+  );
+  poemsCacheLoaded = true;
+
+  try {
+    await deleteCachedPoemFromDb(poemId);
+  } catch (err) {
+    console.warn("Could not update poems cache:", err);
+  }
 }
 
 function syncCategoryUI() {
@@ -110,8 +512,7 @@ function syncHadraDropdownUI() {
 
   const sectionLabel =
     (filters.hadraSection &&
-      (HADRA_SECTION_LABELS[filters.hadraSection] ||
-        filters.hadraSection)) ||
+      (HADRA_SECTION_LABELS[filters.hadraSection] || filters.hadraSection)) ||
     "";
   if (labelEl) {
     labelEl.textContent = sectionLabel ? `حضرة - ${sectionLabel}` : "حضرة";
@@ -169,8 +570,7 @@ function setupHadraDropdown() {
 
 function setCategory(category, hadraSection = "") {
   filters.category = category || "";
-  filters.hadraSection =
-    filters.category === "Hadra" ? hadraSection || "" : "";
+  filters.hadraSection = filters.category === "Hadra" ? hadraSection || "" : "";
   syncCategoryUI();
   syncHadraDropdownUI();
   closeHadraDropdown();
@@ -187,6 +587,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   setupAddToWaslaModal();
   setupHadraDropdown();
+  hydrateBookmarks();
+  setupPoemsContainerEvents();
+  setupPaginationEvents();
 
   // Load filters data
   await Promise.allSettled([loadPoets(), loadMaqamat()]);
@@ -302,41 +705,55 @@ async function loadPoems() {
   const container = document.getElementById("poemsContainer");
   if (!container) return;
 
+  const requestController = new AbortController();
+  if (poemsRequestController) poemsRequestController.abort();
+  poemsRequestController = requestController;
+
   showLoading("poemsContainer", "جاري تحميل القصائد...");
 
   try {
-    const result = await poemsApi.getAll({
-      page: currentPage,
-      pageSize,
-      query: filters.q || undefined,
-      poetId: filters.poetId || undefined,
-      maqamId: filters.maqamId || undefined,
-      category: filters.category || undefined,
-      hadraSection:
-        filters.category === "Hadra"
-          ? filters.hadraSection || undefined
-          : undefined,
-    });
+    let localPoems = await ensurePoemsCacheLoaded();
+    if (poemsRequestController !== requestController) return;
 
-    const poems = result?.items || result || [];
-    totalPages = result?.totalPages || 1;
-    const total = result?.totalCount || poems.length;
-
-    // Update count
-    const countEl = document.getElementById("poemsCount");
-    if (countEl) countEl.textContent = `${total} قصيدة`;
-
-    if (!poems.length) {
-      showEmpty("poemsContainer", "لا توجد قصائد تطابق البحث", "search_off");
-      renderPagination();
-      return;
+    if (!localPoems.length || !isPoemsCacheHydrated()) {
+      await hydrateAllPoemsCache(requestController.signal);
+      if (poemsRequestController !== requestController) return;
+      localPoems = poemsCache;
     }
 
-    container.innerHTML = poems.map((poem) => buildPoemCard(poem)).join("");
-    setupCardActions(container);
-    renderPagination();
+    let filteredPoems = filterPoemsLocally(localPoems, filters);
+    const hasActiveFilters = Boolean(
+      filters.q ||
+      filters.poetId ||
+      filters.maqamId ||
+      filters.category ||
+      (filters.category === "Hadra" && filters.hadraSection),
+    );
+
+    if (!filteredPoems.length && (hasActiveFilters || !localPoems.length)) {
+      try {
+        await fetchAndCachePoems(
+          toPoemsQueryParams(filters),
+          requestController.signal,
+        );
+      } catch (err) {
+        if (err?.name === "AbortError") throw err;
+        if (!localPoems.length) throw err;
+      }
+
+      if (poemsRequestController !== requestController) return;
+      filteredPoems = filterPoemsLocally(poemsCache, filters);
+    }
+
+    renderPoemsFromFilteredList(filteredPoems);
   } catch (err) {
+    if (err?.name === "AbortError") return;
+    if (poemsRequestController !== requestController) return;
     container.innerHTML = `<div class="text-center py-12 text-red-400">${escapeHtml(err.message)}</div>`;
+  } finally {
+    if (poemsRequestController === requestController) {
+      poemsRequestController = null;
+    }
   }
 }
 
@@ -463,8 +880,7 @@ function buildPoemCard(poem) {
           }
         </div>
         <a href="view-poem.html?id=${poem.id}"
-          class="flex items-center gap-1 text-primary-light font-bold hover:underline"
-          onclick="event.stopPropagation()">
+          class="flex items-center gap-1 text-primary-light font-bold hover:underline">
           اقرأ القصيدة
           <span class="material-symbols-outlined text-sm rotate-180">arrow_right_alt</span>
         </a>
@@ -472,92 +888,136 @@ function buildPoemCard(poem) {
     </article>`;
 }
 
-function setupCardActions(container) {
-  // Navigate on article click
-  container.querySelectorAll("article[data-id]").forEach((article) => {
-    article.addEventListener("click", (e) => {
-      if (e.target.closest("button") || e.target.closest("a")) return;
-      window.location.href = `view-poem.html?id=${article.dataset.id}`;
-    });
-  });
+function hydrateBookmarks() {
+  const stored = JSON.parse(localStorage.getItem("divan_bookmarks") || "[]");
+  bookmarkedPoemIds = new Set(stored.map((id) => String(id)));
+}
 
-  // Bookmark toggle
-  const initialBookmarks = JSON.parse(
-    localStorage.getItem("divan_bookmarks") || "[]",
-  );
+function syncBookmarkButtons(container) {
   container.querySelectorAll(".bookmark-btn").forEach((btn) => {
-    const id = btn.dataset.id;
+    const poemId = String(btn.dataset.id || "");
+    const isSaved = bookmarkedPoemIds.has(poemId);
     const icon = btn.querySelector(".material-symbols-outlined");
-    if (icon)
-      icon.textContent = initialBookmarks.includes(id)
-        ? "bookmark"
-        : "bookmark_border";
-    if (initialBookmarks.includes(id)) btn.style.color = "#d4b068";
-
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const saved = JSON.parse(localStorage.getItem("divan_bookmarks") || "[]");
-      const idx = saved.indexOf(id);
-      if (idx === -1) {
-        saved.push(id);
-        if (icon) icon.textContent = "bookmark";
-        btn.style.color = "#d4b068";
-        showToast("تم حفظ القصيدة في الإشارات المرجعية", "success");
-      } else {
-        saved.splice(idx, 1);
-        if (icon) icon.textContent = "bookmark_border";
-        btn.style.color = "";
-        showToast("تم إزالة القصيدة من الإشارات المرجعية", "info");
-      }
-      localStorage.setItem("divan_bookmarks", JSON.stringify(saved));
-    });
+    if (icon) icon.textContent = isSaved ? "bookmark" : "bookmark_border";
+    btn.style.color = isSaved ? "#d4b068" : "";
   });
+}
 
-  // Share poem
-  container.querySelectorAll(".share-poem-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
+function setupPoemsContainerEvents() {
+  const container = document.getElementById("poemsContainer");
+  if (!container || container.dataset.eventsBound === "1") return;
+  container.dataset.eventsBound = "1";
+
+  container.addEventListener("click", async (e) => {
+    const bookmarkBtn = e.target.closest(".bookmark-btn");
+    if (bookmarkBtn) {
+      e.stopPropagation();
+      const poemId = String(bookmarkBtn.dataset.id || "");
+      if (!poemId) return;
+
+      const icon = bookmarkBtn.querySelector(".material-symbols-outlined");
+      if (bookmarkedPoemIds.has(poemId)) {
+        bookmarkedPoemIds.delete(poemId);
+        if (icon) icon.textContent = "bookmark_border";
+        bookmarkBtn.style.color = "";
+        showToast("تم إزالة القصيدة من الإشارات المرجعية", "info");
+      } else {
+        bookmarkedPoemIds.add(poemId);
+        if (icon) icon.textContent = "bookmark";
+        bookmarkBtn.style.color = "#d4b068";
+        showToast("تم حفظ القصيدة في الإشارات المرجعية", "success");
+      }
+
+      localStorage.setItem(
+        "divan_bookmarks",
+        JSON.stringify(Array.from(bookmarkedPoemIds)),
+      );
+      return;
+    }
+
+    const shareBtn = e.target.closest(".share-poem-btn");
+    if (shareBtn) {
       e.stopPropagation();
       try {
-        await currentApi.sharePoem(btn.dataset.id);
-        showToast(`تم مشاركة "${btn.dataset.title}" مع الجميع`, "success");
+        await currentApi.sharePoem(shareBtn.dataset.id);
+        showToast(`تم مشاركة "${shareBtn.dataset.title}" مع الجميع`, "success");
       } catch (err) {
         showToast(err.message, "error");
       }
-    });
-  });
+      return;
+    }
 
-  container.querySelectorAll(".add-to-wasla-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    const addBtn = e.target.closest(".add-to-wasla-btn");
+    if (addBtn) {
       e.stopPropagation();
-      openAddToWaslaModal(btn.dataset.id, btn.dataset.title);
-    });
-  });
+      openAddToWaslaModal(addBtn.dataset.id, addBtn.dataset.title);
+      return;
+    }
 
-  // Edit poem
-  container.querySelectorAll(".edit-poem-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    const editBtn = e.target.closest(".edit-poem-btn");
+    if (editBtn) {
       e.stopPropagation();
-      window.location.href = `add-poem.html?id=${btn.dataset.id}`;
-    });
-  });
+      window.location.href = `add-poem.html?id=${editBtn.dataset.id}`;
+      return;
+    }
 
-  // Delete poem
-  container.querySelectorAll(".delete-poem-btn").forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
+    const deleteBtn = e.target.closest(".delete-poem-btn");
+    if (deleteBtn) {
       e.stopPropagation();
       const confirmed = await showConfirm(
-        `هل أنت متأكد من حذف "${btn.dataset.title}"؟ لا يمكن التراجع عن هذا الإجراء.`,
+        `هل أنت متأكد من حذف "${deleteBtn.dataset.title}"؟ لا يمكن التراجع عن هذا الإجراء.`,
         "حذف القصيدة",
       );
       if (!confirmed) return;
       try {
-        await poemsApi.delete(btn.dataset.id);
+        await poemsApi.delete(deleteBtn.dataset.id);
+        await removePoemFromLocalCache(deleteBtn.dataset.id);
         showToast("تم حذف القصيدة بنجاح", "success");
         loadPoems();
       } catch (err) {
         showToast(err.message, "error");
       }
-    });
+      return;
+    }
+
+    const article = e.target.closest("article[data-id]");
+    if (!article || !container.contains(article)) return;
+    if (e.target.closest("a")) return;
+    window.location.href = `view-poem.html?id=${article.dataset.id}`;
+  });
+}
+
+function setupPaginationEvents() {
+  const container = document.getElementById("pagination");
+  if (!container || container.dataset.eventsBound === "1") return;
+  container.dataset.eventsBound = "1";
+
+  container.addEventListener("click", (e) => {
+    const pageBtn = e.target.closest("[data-page]");
+    if (pageBtn) {
+      const page = Number.parseInt(pageBtn.dataset.page, 10);
+      if (!Number.isNaN(page) && page !== currentPage) {
+        currentPage = page;
+        loadPoems();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return;
+    }
+
+    if (e.target.closest("#prevPage")) {
+      if (currentPage > 1) {
+        currentPage--;
+        loadPoems();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return;
+    }
+
+    if (e.target.closest("#nextPage") && currentPage < totalPages) {
+      currentPage++;
+      loadPoems();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   });
 }
 
@@ -611,6 +1071,10 @@ function openAddToWaslaModal(poemId, poemTitle) {
 function closeAddToWaslaModal() {
   const modal = document.getElementById("addToWaslaModal");
   if (!modal) return;
+  if (waslatOptionsRequestController) {
+    waslatOptionsRequestController.abort();
+    waslatOptionsRequestController = null;
+  }
   modal.classList.add("hidden");
   selectedPoemId = null;
 }
@@ -626,8 +1090,16 @@ async function loadWaslatOptions() {
   select.innerHTML = `<option value="">جاري التحميل...</option>`;
   if (hint) hint.textContent = "";
 
+  const requestController = new AbortController();
+  if (waslatOptionsRequestController) waslatOptionsRequestController.abort();
+  waslatOptionsRequestController = requestController;
+
   try {
-    const result = await waslatApi.getAll();
+    const result = await waslatApi.getAll(undefined, {
+      signal: requestController.signal,
+    });
+    if (waslatOptionsRequestController !== requestController) return;
+
     const items = result?.items || result || [];
     if (!items.length) {
       select.innerHTML = `<option value="">لا توجد وصلات</option>`;
@@ -643,8 +1115,14 @@ async function loadWaslatOptions() {
     select.disabled = false;
     if (confirmBtn) confirmBtn.disabled = false;
   } catch (err) {
+    if (err?.name === "AbortError") return;
+    if (waslatOptionsRequestController !== requestController) return;
     select.innerHTML = `<option value="">تعذر تحميل الوصلات</option>`;
     if (hint) hint.textContent = err.message || "تعذر تحميل الوصلات";
+  } finally {
+    if (waslatOptionsRequestController === requestController) {
+      waslatOptionsRequestController = null;
+    }
   }
 }
 
@@ -658,16 +1136,40 @@ function renderPagination() {
   }
 
   const pages = [];
-  for (let i = 1; i <= totalPages; i++) {
-    pages.push(`
-      <button data-page="${i}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+  const maxVisiblePages = 7;
+
+  const pageButton = (page) => `
+      <button data-page="${page}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all
         ${
-          i === currentPage
+          page === currentPage
             ? "bg-primary text-white"
             : "bg-white/5 text-[#9db8b6] hover:bg-white/10 hover:text-white"
         }">
-        ${i}
-      </button>`);
+        ${page}
+      </button>`;
+
+  const ellipsis =
+    '<span class="px-2 py-1.5 text-[#6b8c89] text-sm select-none">...</span>';
+
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+  if (endPage - startPage + 1 < maxVisiblePages) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+  }
+
+  if (startPage > 1) {
+    pages.push(pageButton(1));
+    if (startPage > 2) pages.push(ellipsis);
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(pageButton(i));
+  }
+
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) pages.push(ellipsis);
+    pages.push(pageButton(totalPages));
   }
 
   container.innerHTML = `
@@ -684,27 +1186,4 @@ function renderPagination() {
         <span class="material-symbols-outlined text-lg">chevron_left</span>
       </button>
     </div>`;
-
-  container.querySelectorAll("[data-page]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      currentPage = parseInt(btn.dataset.page);
-      loadPoems();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-  });
-
-  container.querySelector("#prevPage")?.addEventListener("click", () => {
-    if (currentPage > 1) {
-      currentPage--;
-      loadPoems();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  });
-  container.querySelector("#nextPage")?.addEventListener("click", () => {
-    if (currentPage < totalPages) {
-      currentPage++;
-      loadPoems();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  });
 }

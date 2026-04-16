@@ -1,25 +1,46 @@
 // UI utilities - Toast, Modal, Loading for ديوان الصوفية
 
 // ─── Toast Notifications ──────────────────────────────────────────────────────
-const toastContainer = document.createElement('div');
-toastContainer.id = 'toast-container';
+const toastContainer = document.createElement("div");
+toastContainer.id = "toast-container";
 toastContainer.style.cssText = `
   position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%);
   z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem;
   pointer-events: none; min-width: 280px; max-width: 90vw;
 `;
-document.addEventListener('DOMContentLoaded', () => document.body.appendChild(toastContainer));
+document.addEventListener("DOMContentLoaded", () =>
+  document.body.appendChild(toastContainer),
+);
 
-export function showToast(message, type = 'info', duration = 3500) {
+let spinnerKeyframesReady = false;
+
+function ensureSpinnerKeyframes() {
+  if (spinnerKeyframesReady) return;
+  const styleId = "divan-spinner-keyframes";
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = "@keyframes divanSpin{to{transform:rotate(360deg)}}";
+    document.head.appendChild(style);
+  }
+  spinnerKeyframesReady = true;
+}
+
+export function showToast(message, type = "info", duration = 3500) {
   const colors = {
-    success: 'rgba(16,185,129,0.95)',
-    error:   'rgba(239,68,68,0.95)',
-    warning: 'rgba(245,158,11,0.95)',
-    info:    'rgba(21,140,130,0.95)',
+    success: "rgba(16,185,129,0.95)",
+    error: "rgba(239,68,68,0.95)",
+    warning: "rgba(245,158,11,0.95)",
+    info: "rgba(21,140,130,0.95)",
   };
-  const icons = { success: 'check_circle', error: 'error', warning: 'warning', info: 'info' };
+  const icons = {
+    success: "check_circle",
+    error: "error",
+    warning: "warning",
+    info: "info",
+  };
 
-  const toast = document.createElement('div');
+  const toast = document.createElement("div");
   toast.style.cssText = `
     background: ${colors[type] || colors.info};
     color: #fff; padding: 0.875rem 1.25rem; border-radius: 0.875rem;
@@ -35,13 +56,13 @@ export function showToast(message, type = 'info', duration = 3500) {
   toastContainer.appendChild(toast);
 
   requestAnimationFrame(() => {
-    toast.style.opacity = '1';
-    toast.style.transform = 'translateY(0)';
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
   });
 
   const remove = () => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(-10px)';
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(-10px)";
     setTimeout(() => toast.remove(), 300);
   };
   toast.onclick = remove;
@@ -49,9 +70,9 @@ export function showToast(message, type = 'info', duration = 3500) {
 }
 
 // ─── Modal / Confirm Dialog ───────────────────────────────────────────────────
-export function showConfirm(message, title = 'تأكيد') {
+export function showConfirm(message, title = "تأكيد") {
   return new Promise((resolve) => {
-    const overlay = document.createElement('div');
+    const overlay = document.createElement("div");
     overlay.style.cssText = `
       position: fixed; inset: 0; background: rgba(0,0,0,0.7);
       backdrop-filter: blur(4px); z-index: 8888;
@@ -80,30 +101,45 @@ export function showConfirm(message, title = 'تأكيد') {
         </div>
       </div>`;
     document.body.appendChild(overlay);
-    overlay.querySelector('#confirmYes').onclick = () => { overlay.remove(); resolve(true); };
-    overlay.querySelector('#confirmNo').onclick  = () => { overlay.remove(); resolve(false); };
-    overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
+    overlay.querySelector("#confirmYes").onclick = () => {
+      overlay.remove();
+      resolve(true);
+    };
+    overlay.querySelector("#confirmNo").onclick = () => {
+      overlay.remove();
+      resolve(false);
+    };
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        resolve(false);
+      }
+    };
   });
 }
 
 // ─── Loading Spinner ──────────────────────────────────────────────────────────
-export function showLoading(containerId, message = 'جاري التحميل...') {
+export function showLoading(containerId, message = "جاري التحميل...") {
   const el = containerId ? document.getElementById(containerId) : document.body;
   if (!el) return;
+  ensureSpinnerKeyframes();
   el.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
       padding:3rem;gap:1rem;color:rgba(255,255,255,0.6);font-family:'Cairo',sans-serif;">
       <div style="
         width:40px;height:40px;border:3px solid rgba(21,140,130,0.3);
-        border-top-color:#158c82;border-radius:50%;animation:spin 0.8s linear infinite;
+        border-top-color:#158c82;border-radius:50%;animation:divanSpin 0.8s linear infinite;
       "></div>
       <span>${message}</span>
-    </div>
-    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+    </div>`;
 }
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
-export function showEmpty(containerId, message = 'لا توجد بيانات', icon = 'inbox') {
+export function showEmpty(
+  containerId,
+  message = "لا توجد بيانات",
+  icon = "inbox",
+) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = `
@@ -118,9 +154,9 @@ export function showEmpty(containerId, message = 'لا توجد بيانات', i
 export function renderUserBadge(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const user = JSON.parse(localStorage.getItem('divan_user') || 'null');
+  const user = JSON.parse(localStorage.getItem("divan_user") || "null");
   if (!user) return;
-  const roleLabel = user.role === 'LeadMunshid' ? 'منشد رئيسي' : 'منشد';
+  const roleLabel = user.role === "LeadMunshid" ? "منشد رئيسي" : "منشد";
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:0.5rem;">
       <div style="width:2rem;height:2rem;border-radius:50%;background:rgba(21,140,130,0.3);

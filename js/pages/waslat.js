@@ -10,7 +10,6 @@ import {
 import { showToast, showConfirm, showLoading, showEmpty } from "../ui.js";
 import {
   escapeHtml,
-  debounce,
   getMaqamColor,
   getPoemMaqamName,
   getPoemPoetName,
@@ -23,8 +22,18 @@ let waslat = [];
 let selectedWaslaId = null;
 const poetNameById = new Map();
 const maqamNameById = new Map();
+const poemByIdCache = new Map();
+let waslatListRequestController = null;
+let poemsSearchRequestController = null;
 const shouldOpenCurrentWasla =
   new URLSearchParams(window.location.search).get("openCurrent") === "1";
+const addPoemModalState = {
+  initialized: false,
+  waslaId: null,
+  searchTimeout: null,
+  doSearch: null,
+};
+let createWaslaModalReady = false;
 
 function getNameFromMap(map, id) {
   if (id === null || id === undefined || id === "") return "";
@@ -50,6 +59,20 @@ function getItemPoemId(item) {
   );
 }
 
+function getPoemByIdCached(poemId) {
+  const key = String(poemId);
+  const cached = poemByIdCache.get(key);
+  if (cached) return cached;
+
+  const request = poemsApi.getById(poemId).catch((err) => {
+    poemByIdCache.delete(key);
+    throw err;
+  });
+
+  poemByIdCache.set(key, request);
+  return request;
+}
+
 async function enrichWaslaItems(items) {
   if (!items.length) return items;
 
@@ -71,7 +94,7 @@ async function enrichWaslaItems(items) {
       if (existingPoet && existingMaqam) return item;
 
       try {
-        const poem = await poemsApi.getById(poemId);
+        const poem = await getPoemByIdCached(poemId);
         return {
           ...item,
           poem,
@@ -104,6 +127,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document
     .getElementById("createWaslaBtn")
     ?.addEventListener("click", () => showCreateWaslaModal());
+
+  setupWaslatContainerEvents();
+  setupAddPoemModal();
+  setupCreateWaslaModal();
 
   await Promise.allSettled([loadPoets(), loadMaqamat()]);
 
@@ -168,13 +195,64 @@ async function loadMaqamat() {
   } catch {}
 }
 
+function setupWaslatContainerEvents() {
+  const container = document.getElementById("waslatContainer");
+  if (!container || container.dataset.eventsBound === "1") return;
+  container.dataset.eventsBound = "1";
+
+  container.addEventListener("click", async (e) => {
+    const shareBtn = e.target.closest(".share-wasla-btn");
+    if (shareBtn) {
+      e.stopPropagation();
+      try {
+        await currentApi.shareWasla(shareBtn.dataset.id);
+        showToast("تم مشاركة الوصلة مع الجميع", "success");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+      return;
+    }
+
+    const deleteBtn = e.target.closest(".delete-wasla-btn");
+    if (deleteBtn) {
+      e.stopPropagation();
+      const confirmed = await showConfirm(
+        `هل أنت متأكد من حذف "${deleteBtn.dataset.name}"؟`,
+        "حذف الوصلة",
+      );
+      if (!confirmed) return;
+      try {
+        await waslatApi.delete(deleteBtn.dataset.id);
+        showToast("تم حذف الوصلة", "success");
+        loadWaslat();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+      return;
+    }
+
+    const card = e.target.closest(".wasla-card");
+    if (!card || !container.contains(card)) return;
+    openWaslaDetail(card.dataset.id);
+  });
+}
+
 async function loadWaslat() {
   const container = document.getElementById("waslatContainer");
   if (!container) return;
+
+  const requestController = new AbortController();
+  if (waslatListRequestController) waslatListRequestController.abort();
+  waslatListRequestController = requestController;
+
   showLoading("waslatContainer", "جاري تحميل الوصلات...");
 
   try {
-    const result = await waslatApi.getAll();
+    const result = await waslatApi.getAll(undefined, {
+      signal: requestController.signal,
+    });
+    if (waslatListRequestController !== requestController) return;
+
     waslat = result?.items || result || [];
     if (!waslat.length) {
       showEmpty(
@@ -186,7 +264,13 @@ async function loadWaslat() {
     }
     renderWaslat(waslat);
   } catch (err) {
+    if (err?.name === "AbortError") return;
+    if (waslatListRequestController !== requestController) return;
     container.innerHTML = `<div class="text-center py-12 text-red-400">${escapeHtml(err.message)}</div>`;
+  } finally {
+    if (waslatListRequestController === requestController) {
+      waslatListRequestController = null;
+    }
   }
 }
 
@@ -194,46 +278,6 @@ function renderWaslat(list) {
   const container = document.getElementById("waslatContainer");
   if (!container) return;
   container.innerHTML = list.map((w) => buildWaslaCard(w)).join("");
-
-  // Attach click handlers
-  container.querySelectorAll(".wasla-card").forEach((card) => {
-    card.addEventListener("click", (e) => {
-      if (e.target.closest("button")) return;
-      openWaslaDetail(card.dataset.id);
-    });
-  });
-
-  if (isLead()) {
-    container.querySelectorAll(".share-wasla-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        try {
-          await currentApi.shareWasla(btn.dataset.id);
-          showToast("تم مشاركة الوصلة مع الجميع", "success");
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      });
-    });
-
-    container.querySelectorAll(".delete-wasla-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const confirmed = await showConfirm(
-          `هل أنت متأكد من حذف "${btn.dataset.name}"؟`,
-          "حذف الوصلة",
-        );
-        if (!confirmed) return;
-        try {
-          await waslatApi.delete(btn.dataset.id);
-          showToast("تم حذف الوصلة", "success");
-          loadWaslat();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      });
-    });
-  }
 }
 
 function buildWaslaCard(w) {
@@ -340,9 +384,7 @@ function renderWaslaDetail(wasla, container) {
     <div id="waslaItemsList" class="flex flex-col gap-3">
       ${
         items.length
-          ? items
-              .map((item, idx) => buildWaslaItem(item, idx, wasla.id, lead))
-              .join("")
+          ? items.map((item) => buildWaslaItem(item, lead)).join("")
           : `<div class="text-center py-8 text-[#9db8b6]">
             <span class="material-symbols-outlined text-4xl mb-2">queue_music</span>
             <p>لا توجد قصائد في هذه الوصلة بعد</p>
@@ -350,37 +392,36 @@ function renderWaslaDetail(wasla, container) {
       }
     </div>`;
 
+  container.onclick = null;
   if (lead) {
-    container
-      .querySelector("#addToPoemWaslaBtn")
-      ?.addEventListener("click", () => {
+    container.onclick = async (e) => {
+      const addBtn = e.target.closest("#addToPoemWaslaBtn");
+      if (addBtn) {
         showAddPoemToWaslaModal(wasla.id);
-      });
+        return;
+      }
 
-    container.querySelectorAll(".remove-item-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const confirmed = await showConfirm(
-          "هل تريد حذف هذه القصيدة من الوصلة؟",
-        );
-        if (!confirmed) return;
-        try {
-          await waslatApi.removeItem(wasla.id, btn.dataset.itemId);
-          showToast("تم حذف القصيدة من الوصلة", "success");
-          const updated = await waslatApi.getById(wasla.id);
-          const items = await enrichWaslaItems(updated.items || []);
-          renderWaslaDetail({ ...updated, items }, container);
-          // Reload waslat list to update count
-          loadWaslat();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      });
-    });
+      const removeBtn = e.target.closest(".remove-item-btn");
+      if (!removeBtn) return;
+
+      e.stopPropagation();
+      const confirmed = await showConfirm("هل تريد حذف هذه القصيدة من الوصلة؟");
+      if (!confirmed) return;
+      try {
+        await waslatApi.removeItem(wasla.id, removeBtn.dataset.itemId);
+        showToast("تم حذف القصيدة من الوصلة", "success");
+        const updated = await waslatApi.getById(wasla.id);
+        const items = await enrichWaslaItems(updated.items || []);
+        renderWaslaDetail({ ...updated, items }, container);
+        loadWaslat();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    };
   }
 }
 
-function buildWaslaItem(item, idx, waslaId, lead) {
+function buildWaslaItem(item, lead) {
   const poemId = getItemPoemId(item);
   const poem = {
     id: poemId,
@@ -492,8 +533,7 @@ function buildWaslaItem(item, idx, waslaId, lead) {
           }
         </div>
         <a href="${readLink}"
-          class="flex items-center gap-1 text-primary-light font-bold hover:underline ${readLinkClass}"
-          onclick="event.stopPropagation()">
+          class="flex items-center gap-1 text-primary-light font-bold hover:underline ${readLinkClass}">
           اقرأ القصيدة
           <span class="material-symbols-outlined text-sm rotate-180">arrow_right_alt</span>
         </a>
@@ -501,20 +541,29 @@ function buildWaslaItem(item, idx, waslaId, lead) {
     </article>`;
 }
 
-async function showAddPoemToWaslaModal(waslaId) {
+function setupAddPoemModal() {
+  if (addPoemModalState.initialized) return;
   const modal = document.getElementById("addPoemModal");
   if (!modal) return;
-  modal.classList.remove("hidden");
 
   const searchInput = modal.querySelector("#poemSearchInput");
   const resultsContainer = modal.querySelector("#poemSearchResults");
-  let searchTimeout;
 
-  const doSearch = async (q) => {
+  addPoemModalState.doSearch = async (q) => {
     if (!resultsContainer) return;
+
+    const requestController = new AbortController();
+    if (poemsSearchRequestController) poemsSearchRequestController.abort();
+    poemsSearchRequestController = requestController;
+
     showLoading("poemSearchResults");
     try {
-      const result = await poemsApi.getAll({ query: q, pageSize: 10 });
+      const result = await poemsApi.getAll(
+        { query: q, pageSize: 10 },
+        { signal: requestController.signal },
+      );
+      if (poemsSearchRequestController !== requestController) return;
+
       const items = result?.items || result || [];
       if (!items.length) {
         showEmpty("poemSearchResults", "لا توجد نتائج", "search_off");
@@ -537,84 +586,134 @@ async function showAddPoemToWaslaModal(waslaId) {
         </button>`,
         )
         .join("");
-
-      resultsContainer.querySelectorAll(".add-to-wasla-item").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          try {
-            await waslatApi.addItem(waslaId, { poemId: btn.dataset.id });
-            showToast(`تم إضافة "${btn.dataset.title}" للوصلة`, "success");
-            modal.classList.add("hidden");
-            // Refresh wasla detail
-            const updated = await waslatApi.getById(selectedWaslaId);
-            const items = await enrichWaslaItems(updated.items || []);
-            const detailContainer = document.getElementById(
-              "waslaDetailContainer",
-            );
-            if (detailContainer)
-              renderWaslaDetail({ ...updated, items }, detailContainer);
-            loadWaslat();
-          } catch (err) {
-            showToast(err.message, "error");
-          }
-        });
-      });
     } catch (err) {
+      if (err?.name === "AbortError") return;
+      if (poemsSearchRequestController !== requestController) return;
       if (resultsContainer)
         resultsContainer.innerHTML = `<div class="text-red-400 p-4">${escapeHtml(err.message)}</div>`;
+    } finally {
+      if (poemsSearchRequestController === requestController) {
+        poemsSearchRequestController = null;
+      }
     }
   };
 
-  searchInput?.addEventListener("input", () => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => doSearch(searchInput.value.trim()), 300);
-  });
-
-  // Initial load
-  doSearch("");
-
-  // Close
-  modal.querySelector("#closeAddPoemModal")?.addEventListener("click", () => {
+  const closeAddPoemModal = () => {
+    if (addPoemModalState.searchTimeout) {
+      clearTimeout(addPoemModalState.searchTimeout);
+      addPoemModalState.searchTimeout = null;
+    }
+    if (poemsSearchRequestController) {
+      poemsSearchRequestController.abort();
+      poemsSearchRequestController = null;
+    }
     modal.classList.add("hidden");
-  });
-  modal.onclick = (e) => {
-    if (e.target === modal) modal.classList.add("hidden");
   };
+
+  resultsContainer?.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".add-to-wasla-item");
+    if (!btn) return;
+
+    const activeWaslaId = addPoemModalState.waslaId || selectedWaslaId;
+    if (!activeWaslaId) return;
+
+    try {
+      await waslatApi.addItem(activeWaslaId, { poemId: btn.dataset.id });
+      showToast(`تم إضافة "${btn.dataset.title}" للوصلة`, "success");
+      closeAddPoemModal();
+      const updated = await waslatApi.getById(activeWaslaId);
+      const items = await enrichWaslaItems(updated.items || []);
+      const detailContainer = document.getElementById("waslaDetailContainer");
+      if (detailContainer)
+        renderWaslaDetail({ ...updated, items }, detailContainer);
+      loadWaslat();
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  });
+
+  searchInput?.addEventListener("input", () => {
+    clearTimeout(addPoemModalState.searchTimeout);
+    addPoemModalState.searchTimeout = setTimeout(
+      () => addPoemModalState.doSearch(searchInput.value.trim()),
+      300,
+    );
+  });
+
+  modal.querySelector("#closeAddPoemModal")?.addEventListener("click", () => {
+    closeAddPoemModal();
+  });
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeAddPoemModal();
+  });
+
+  addPoemModalState.initialized = true;
 }
 
-function showCreateWaslaModal() {
-  const modal = document.getElementById("createWaslaModal");
+async function showAddPoemToWaslaModal(waslaId) {
+  const modal = document.getElementById("addPoemModal");
   if (!modal) return;
+
+  setupAddPoemModal();
+  addPoemModalState.waslaId = waslaId;
   modal.classList.remove("hidden");
 
+  const searchInput = modal.querySelector("#poemSearchInput");
+  if (searchInput) searchInput.value = "";
+  await addPoemModalState.doSearch?.("");
+}
+
+function setupCreateWaslaModal() {
+  if (createWaslaModalReady) return;
+
+  const modal = document.getElementById("createWaslaModal");
+  if (!modal) return;
+
   const form = modal.querySelector("#createWaslaForm");
-  form?.addEventListener(
-    "submit",
-    async (e) => {
-      e.preventDefault();
-      const name = modal.querySelector("#waslaName")?.value.trim();
-      const desc = modal.querySelector("#waslaDesc")?.value.trim();
-      if (!name) {
-        showToast("اسم الوصلة مطلوب", "error");
-        return;
-      }
-      try {
-        await waslatApi.create({ name, description: desc || null });
-        showToast("تم إنشاء الوصلة بنجاح", "success");
-        modal.classList.add("hidden");
-        loadWaslat();
-      } catch (err) {
-        showToast(err.message, "error");
-      }
-    },
-    { once: true },
-  );
+  let submitting = false;
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    const name = modal.querySelector("#waslaName")?.value.trim();
+    const desc = modal.querySelector("#waslaDesc")?.value.trim();
+    if (!name) {
+      showToast("اسم الوصلة مطلوب", "error");
+      return;
+    }
+
+    submitting = true;
+    try {
+      await waslatApi.create({ name, description: desc || null });
+      showToast("تم إنشاء الوصلة بنجاح", "success");
+      modal.classList.add("hidden");
+      form.reset();
+      loadWaslat();
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      submitting = false;
+    }
+  });
 
   modal
     .querySelector("#closeCreateWaslaModal")
     ?.addEventListener("click", () => {
       modal.classList.add("hidden");
     });
-  modal.onclick = (e) => {
+  modal.addEventListener("click", (e) => {
     if (e.target === modal) modal.classList.add("hidden");
-  };
+  });
+
+  createWaslaModalReady = true;
+}
+
+function showCreateWaslaModal() {
+  const modal = document.getElementById("createWaslaModal");
+  if (!modal) return;
+  setupCreateWaslaModal();
+
+  modal.querySelector("#createWaslaForm")?.reset();
+  modal.classList.remove("hidden");
 }
