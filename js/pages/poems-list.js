@@ -319,8 +319,9 @@ async function loadPoems() {
     });
 
     const poems = result?.items || result || [];
-    totalPages = result?.totalPages || 1;
     const total = result?.totalCount || poems.length;
+    totalPages =
+      result?.totalPages || Math.max(1, Math.ceil(total / pageSize));
 
     // Update count
     const countEl = document.getElementById("poemsCount");
