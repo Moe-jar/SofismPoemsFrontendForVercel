@@ -22,7 +22,7 @@ git push origin main
 2. Click **"Add New..."** → **"Project"**
 3. Select your GitHub repository
 4. Configure:
-   - **Root Directory**: `frontend/` (if this folder isn't the root)
+   - **Root Directory**: Leave empty. This repository's root already contains `index.html`.
    - Leave Build Command and Output Directory empty (static site)
 5. Click **"Deploy"**
 
@@ -93,7 +93,14 @@ app.UseCors(MyAllowSpecificOrigins);
 
 ### Issue: 404 errors on page refresh
 
-**Fixed** ✅ - `vercel.json` rewrites all non-matching routes to `index.html`
+This project uses separate HTML files for each page, so each page must be opened
+using its `.html` path (for example, `/pages/poems.html`). The Vercel
+configuration deliberately does not use a catch-all rewrite because that would
+return `index.html` for JavaScript, CSS, and page requests.
+
+If the root URL still returns `404`, check that the Vercel project's **Root
+Directory** is empty (the repository itself contains `index.html`) and redeploy
+the latest commit.
 
 ### Issue: Slow API responses (Render free tier)
 
