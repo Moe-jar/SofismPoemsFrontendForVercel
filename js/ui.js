@@ -39,13 +39,18 @@ export function showToast(message, type = 'info', duration = 3500) {
     toast.style.transform = 'translateY(0)';
   });
 
+  let removed = false;
+  let removeTimer;
   const remove = () => {
+    if (removed) return;
+    removed = true;
+    clearTimeout(removeTimer);
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(-10px)';
     setTimeout(() => toast.remove(), 300);
   };
   toast.onclick = remove;
-  setTimeout(remove, duration);
+  removeTimer = setTimeout(remove, duration);
 }
 
 // ─── Modal / Confirm Dialog ───────────────────────────────────────────────────

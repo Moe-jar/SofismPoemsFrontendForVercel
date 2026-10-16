@@ -1,41 +1,54 @@
 // SignalR + Polling fallback for real-time updates
-import { API_BASE, SIGNALR_HUB, POLL_INTERVAL } from './config.js';
-import { getToken } from './auth.js';
+import { POLL_INTERVAL } from "./config.js";
 
 let pollTimer = null;
 const listeners = {};
+let activePoll = null;
 
 // Simple event emitter
 function emit(event, data) {
-  (listeners[event] || []).forEach(fn => fn(data));
+  [...(listeners[event] || [])].forEach((fn) => fn(data));
 }
 
 export function on(event, fn) {
   if (!listeners[event]) listeners[event] = [];
-  listeners[event].push(fn);
+  if (!listeners[event].includes(fn)) listeners[event].push(fn);
+  return () => off(event, fn);
 }
 
 export function off(event, fn) {
   if (!listeners[event]) return;
   listeners[event] = listeners[event].filter(f => f !== fn);
+  if (listeners[event].length === 0) delete listeners[event];
 }
 
 // Polling-based fallback (always used since we don't bundle SignalR client)
 export function startPolling(fetchCurrentPoem, fetchCurrentWasla) {
-  if (pollTimer) stopPolling();
+  stopPolling();
+  const pollRun = { inFlight: false };
+  activePoll = pollRun;
 
   const poll = async () => {
+    if (activePoll !== pollRun || pollRun.inFlight) return;
+    pollRun.inFlight = true;
+
     try {
       if (fetchCurrentPoem) {
         const poem = await fetchCurrentPoem();
-        emit('currentPoemUpdated', poem);
+        if (activePoll !== pollRun) return;
+        emit("currentPoemUpdated", poem);
       }
       if (fetchCurrentWasla) {
         const wasla = await fetchCurrentWasla();
-        emit('currentWaslaUpdated', wasla);
+        if (activePoll !== pollRun) return;
+        emit("currentWaslaUpdated", wasla);
       }
     } catch (err) {
-      console.warn('Polling error:', err.message);
+      if (activePoll === pollRun) {
+        console.warn("Polling error:", err.message);
+      }
+    } finally {
+      pollRun.inFlight = false;
     }
   };
 
@@ -44,7 +57,8 @@ export function startPolling(fetchCurrentPoem, fetchCurrentWasla) {
 }
 
 export function stopPolling() {
-  if (pollTimer) {
+  activePoll = null;
+  if (pollTimer !== null) {
     clearInterval(pollTimer);
     pollTimer = null;
   }

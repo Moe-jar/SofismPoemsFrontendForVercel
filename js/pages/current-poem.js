@@ -9,6 +9,7 @@ if (!requireAuth()) throw new Error("Not authenticated");
 
 let currentPoem = null;
 let lastPoemId = null;
+let unsubscribePoemUpdates = () => {};
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (isLead()) {
@@ -26,7 +27,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadCurrentPoem();
 
   // Start polling for updates
-  on("currentPoemUpdated", (state) => {
+  unsubscribePoemUpdates = on("currentPoemUpdated", (state) => {
     if (state?.poem?.id !== lastPoemId) {
       loadCurrentPoem();
     }
@@ -35,8 +36,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   startPolling(() => currentApi.getPoem(), null);
 });
 
-// Cleanup polling on page unload
-window.addEventListener("beforeunload", stopPolling);
+function cleanupLiveUpdates() {
+  unsubscribePoemUpdates();
+  unsubscribePoemUpdates = () => {};
+  stopPolling();
+}
+
+window.addEventListener("pagehide", cleanupLiveUpdates);
 
 async function loadCurrentPoem() {
   const container = document.getElementById("poemContainer");

@@ -8,6 +8,7 @@ import { startPolling, stopPolling, on } from "../signalr.js";
 if (!requireAuth()) throw new Error("Not authenticated");
 
 let lastWaslaId = null;
+let unsubscribeWaslaUpdates = () => {};
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (isLead()) {
@@ -22,14 +23,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadCurrentWasla();
 
-  on("currentWaslaUpdated", (state) => {
+  unsubscribeWaslaUpdates = on("currentWaslaUpdated", (state) => {
     if (state?.wasla?.id !== lastWaslaId) loadCurrentWasla();
   });
 
   startPolling(null, () => currentApi.getWasla());
 });
 
-window.addEventListener("beforeunload", stopPolling);
+function cleanupLiveUpdates() {
+  unsubscribeWaslaUpdates();
+  unsubscribeWaslaUpdates = () => {};
+  stopPolling();
+}
+
+window.addEventListener("pagehide", cleanupLiveUpdates);
 
 async function loadCurrentWasla() {
   const container = document.getElementById("waslaContainer");
