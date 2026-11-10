@@ -325,6 +325,15 @@ html[data-theme] textarea {
     "opsz" 24;
 }
 
+.material-symbols-outlined[data-icon-fallback="true"] {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  font-size: 0 !important;
+  background-color: currentColor;
+  -webkit-mask: var(--icon-svg) center / contain no-repeat;
+  mask: var(--icon-svg) center / contain no-repeat;
+}
+
 button,
 a,
 [role="button"] {
