@@ -12,7 +12,7 @@ A mobile-first, production-ready frontend for the **ديوان الصوفية** 
 - 🎵 **Wasla playlists** — create, manage, add/remove poems
 - 📡 **Live sharing** — real-time current poem & wasla with polling fallback (20s)
 - 🔖 **Bookmarks** saved locally
-- ⚡ **No build tools** — pure vanilla JavaScript with ES6 modules
+- ⚡ **Tailwind Build System** — Compiled CSS for maximum performance
 
 ## Project Structure
 
@@ -20,8 +20,12 @@ A mobile-first, production-ready frontend for the **ديوان الصوفية** 
 frontend/
 ├── index.html              # Home / landing page
 ├── login.html              # Authentication page
+├── package.json            # Build scripts and dependencies
+├── tailwind.config.js      # Tailwind configuration
 ├── css/
-│   └── design.css          # Shared design system (glass, animations, etc.)
+│   ├── design.css          # Shared design system
+│   ├── input.css           # Tailwind source
+│   └── output.css          # Compiled Tailwind (Production)
 ├── js/
 │   ├── config.js           # API base URL configuration
 │   ├── api.js              # All backend API calls
@@ -49,7 +53,15 @@ frontend/
 
 ## Setup
 
-### 1. Start the Backend API
+### 1. Build CSS
+
+If you change any Tailwind classes, rebuild the CSS:
+```bash
+npm install
+npm run build:css
+```
+
+### 2. Start the Backend API
 
 ```bash
 cd src/DivanSufi.WebApi

@@ -4,6 +4,25 @@ import { POLL_INTERVAL } from "./config.js";
 let pollTimer = null;
 const listeners = {};
 let activePoll = null;
+let pollTick = null;
+
+function clearPollTimer() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function onVisibilityChange() {
+  if (!pollTick) return;
+  if (document.hidden) {
+    clearPollTimer();
+    return;
+  }
+  pollTick();
+  clearPollTimer();
+  pollTimer = setInterval(pollTick, POLL_INTERVAL);
+}
 
 // Simple event emitter
 function emit(event, data) {
@@ -52,14 +71,19 @@ export function startPolling(fetchCurrentPoem, fetchCurrentWasla) {
     }
   };
 
-  poll(); // immediate first call
-  pollTimer = setInterval(poll, POLL_INTERVAL);
+  pollTick = poll;
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  if (!document.hidden) {
+    poll();
+    pollTimer = setInterval(poll, POLL_INTERVAL);
+  }
 }
 
 export function stopPolling() {
   activePoll = null;
-  if (pollTimer !== null) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  pollTick = null;
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+  clearPollTimer();
 }

@@ -59,7 +59,7 @@ export function showConfirm(message, title = 'تأكيد') {
     const overlay = document.createElement('div');
     overlay.style.cssText = `
       position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px); z-index: 8888;
+      -webkit-backdrop-filter: none; backdrop-filter: none; z-index: 8888;
       display: flex; align-items: center; justify-content: center; padding: 1rem;
     `;
     overlay.innerHTML = `
@@ -103,8 +103,7 @@ export function showLoading(containerId, message = 'جاري التحميل...')
         border-top-color:#158c82;border-radius:50%;animation:spin 0.8s linear infinite;
       "></div>
       <span>${message}</span>
-    </div>
-    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+    </div>`;
 }
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
@@ -123,7 +122,12 @@ export function showEmpty(containerId, message = 'لا توجد بيانات', i
 export function renderUserBadge(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const user = JSON.parse(localStorage.getItem('divan_user') || 'null');
+  let user = null;
+  try {
+    user = JSON.parse(localStorage.getItem('divan_user') || 'null');
+  } catch {
+    user = null;
+  }
   if (!user) return;
   const roleLabel = user.role === 'LeadMunshid' ? 'منشد رئيسي' : 'منشد';
   el.innerHTML = `

@@ -316,22 +316,33 @@ const AUTO_UI_EN_ENTRIES = Object.entries(AUTO_UI_TEXT_EN_TO_AR).sort(
 
 let autoTranslationObserver = null;
 let isApplyingAutoTranslation = false;
+let pendingTranslationNodes = [];
+let translationFrame = 0;
 
-function replaceEntries(value, entries) {
-  let next = value;
-  for (const [from, to] of entries) {
-    if (!from || !next.includes(from)) continue;
-    next = next.split(from).join(to);
-  }
-  return next;
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function autoTranslateValue(value, lang) {
-  if (typeof value !== "string" || !value.trim()) return value;
+function buildReplacer(entries) {
+  const usable = entries.filter(([from]) => from);
+  const map = new Map(usable);
+  if (!usable.length) return (value) => value;
+  const pattern = usable.map(([from]) => escapeRegExp(from)).join("|");
+  const re = new RegExp(pattern, "g");
+  return (value) => value.replace(re, (match) => map.get(match) || match);
+}
 
-  let next = value;
+const replaceArabic = buildReplacer(AUTO_UI_AR_ENTRIES);
+const replaceEnglish = buildReplacer(AUTO_UI_EN_ENTRIES);
+const HAS_ARABIC = /[\u0600-\u06FF]/;
+const HAS_LATIN = /[A-Za-z]/;
+
+function autoTranslateValue(value, lang) {
+  if (typeof value !== "string" || value.trim().length < 2) return value;
 
   if (lang === "en") {
+    if (!HAS_ARABIC.test(value)) return value;
+    let next = value;
     next = next.replace(/(\d+)\s+قصائد?/g, "$1 poems");
     next = next.replace(/حضرة\s*-\s*/g, "Hadra - ");
     next = next.replace(/القصيدة الحالية:\s*/g, "Current Poem: ");
@@ -349,10 +360,11 @@ function autoTranslateValue(value, lang) {
       /هل أنت متأكد من حذف\s+"([^"]+)"[؟?]/g,
       'Are you sure you want to delete "$1"?',
     );
-    next = replaceEntries(next, AUTO_UI_AR_ENTRIES);
-    return next;
+    return replaceArabic(next);
   }
 
+  if (!HAS_LATIN.test(value)) return value;
+  let next = value;
   next = next.replace(/(\d+)\s+poems?/gi, "$1 قصيدة");
   next = next.replace(/Hadra\s*-\s*/g, "حضرة - ");
   next = next.replace(/Current Poem:\s*/g, "القصيدة الحالية: ");
@@ -367,8 +379,7 @@ function autoTranslateValue(value, lang) {
     /Are you sure you want to delete\s+"([^"]+)"\?/g,
     'هل أنت متأكد من حذف "$1"؟',
   );
-  next = replaceEntries(next, AUTO_UI_EN_ENTRIES);
-  return next;
+  return replaceEnglish(next);
 }
 
 function shouldSkipTranslation(el) {
@@ -441,32 +452,47 @@ function applyAutomaticUiTranslation(lang) {
   }
 }
 
+function flushPendingTranslations() {
+  translationFrame = 0;
+  if (!pendingTranslationNodes.length || !autoTranslationObserver) return;
+
+  const lang = getCurrentLanguage();
+  const nodes = pendingTranslationNodes;
+  pendingTranslationNodes = [];
+
+  autoTranslationObserver.disconnect();
+  isApplyingAutoTranslation = true;
+  try {
+    nodes.forEach((node) => translateTree(node, lang));
+  } finally {
+    isApplyingAutoTranslation = false;
+    if (document.body) {
+      autoTranslationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  }
+}
+
 function ensureAutoTranslationObserver() {
   if (autoTranslationObserver || !document.body) return;
 
   autoTranslationObserver = new MutationObserver((mutations) => {
     if (isApplyingAutoTranslation) return;
 
-    const lang = getCurrentLanguage();
-    isApplyingAutoTranslation = true;
-    try {
-      mutations.forEach((mutation) => {
-        if (mutation.type === "characterData") {
-          translateTextNode(mutation.target, lang);
-        }
-
-        mutation.addedNodes.forEach((node) => {
-          translateTree(node, lang);
-        });
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        pendingTranslationNodes.push(node);
       });
-    } finally {
-      isApplyingAutoTranslation = false;
-    }
+    });
+
+    if (!pendingTranslationNodes.length || translationFrame) return;
+    translationFrame = requestAnimationFrame(flushPendingTranslations);
   });
 
   autoTranslationObserver.observe(document.body, {
     childList: true,
-    characterData: true,
     subtree: true,
   });
 }
@@ -533,24 +559,7 @@ function applyI18nText(lang) {
 }
 
 function ensureLanguageToggle() {
-  let btn = document.getElementById("langToggle");
-  if (btn) return btn;
-  if (!document.body) return null;
-
-  btn = document.createElement("button");
-  btn.id = "langToggle";
-  btn.type = "button";
-  btn.className = "theme-toggle language-toggle-floating";
-  btn.setAttribute("aria-pressed", "false");
-  btn.innerHTML = `
-    <span class="theme-toggle-label">
-      <span class="material-symbols-outlined">translate</span>
-      <span data-lang-code>EN</span>
-      <span data-lang-label>English</span>
-    </span>`;
-
-  document.body.appendChild(btn);
-  return btn;
+  return document.getElementById("langToggle");
 }
 
 function updateLanguageToggle(lang) {

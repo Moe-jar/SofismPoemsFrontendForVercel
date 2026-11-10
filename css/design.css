@@ -139,22 +139,7 @@ body {
 
 #poemBody .verse-item,
 #poemBody > .group {
-  text-wrap: pretty;
-}
-
-html[data-theme] a,
-html[data-theme] button,
-html[data-theme] input,
-html[data-theme] select,
-html[data-theme] textarea,
-html[data-theme] article,
-html[data-theme] section,
-html[data-theme] div {
-  transition:
-    background-color 0.35s ease,
-    color 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
+  text-wrap: wrap;
 }
 
 html[data-theme] [style*="radial-gradient(circle at 50% 0%"] {
@@ -231,19 +216,17 @@ html[data-theme="light"] .animate-float-delay {
   filter: saturate(0.82);
 }
 
-/* Glass panel utility */
+/* Glass panel utility.
+   Backdrop blur is limited to the sticky header and bottom bar.
+   Blurring every card crashes WebKit (Safari / iOS) under memory pressure. */
 .glass-card {
   background: var(--theme-card-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--theme-border);
-  box-shadow: 0 4px 30px var(--theme-shadow);
+  box-shadow: 0 4px 24px var(--theme-shadow);
 }
 
 .glass-panel {
   background: var(--theme-panel-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--theme-border);
 }
 
@@ -279,17 +262,128 @@ html[data-theme="light"] .glass-panel::before {
   opacity: 0.58;
 }
 
+/* Safari-optimized transitions: only essential properties */
+html[data-theme] a,
+html[data-theme] button,
+html[data-theme] input,
+html[data-theme] select,
+html[data-theme] textarea {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+  will-change: background-color, color, opacity;
+}
+
+/* Optimize blur effects for WebKit */
 .glass-header {
   background: var(--theme-header-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Disable expensive blurs on mobile/Safari to prevent memory crashes */
+@media (max-width: 1024px) {
+  .glass-card,
+  .glass-panel,
+  .glass-input {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+/* Optimize background orb animations */
+.animate-float,
+.animate-float-delay {
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
 }
 
 .glass-input {
   background: var(--theme-input-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--theme-border-soft);
+}
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "liga";
+  -webkit-font-feature-settings: "liga";
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@supports (overflow: clip) {
+  body.overflow-x-hidden {
+    overflow-x: clip;
+  }
+}
+
+/* Large CSS blurs and Tailwind backdrop-blur are the usual Safari tab crash. */
+[class*="blur-["],
+[class*="backdrop-blur"] {
+  -webkit-filter: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.animate-float,
+.animate-float-delay {
+  animation: none;
+  opacity: 1;
+  background: radial-gradient(
+    circle,
+    rgba(10, 87, 80, 0.28) 0%,
+    rgba(10, 87, 80, 0) 68%
+  ) !important;
+}
+
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Scrollbar styling */
@@ -322,11 +416,9 @@ html[data-theme="light"] .glass-panel::before {
   }
 }
 
-.animate-float {
-  animation: float-orb 12s ease-in-out infinite;
-}
+.animate-float,
 .animate-float-delay {
-  animation: float-orb 12s ease-in-out infinite 4s;
+  animation: none;
 }
 
 /* Page fade-in */
@@ -437,8 +529,8 @@ html[data-theme="light"] .glass-panel::before {
   left: 0;
   right: 0;
   background: var(--theme-header-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-top: 1px solid var(--theme-border);
   display: flex;
   justify-content: space-around;
@@ -608,20 +700,6 @@ html[data-theme="light"] .hadra-option-active {
   font-size: 1rem;
 }
 
-.language-toggle-floating {
-  position: fixed;
-  top: 1rem;
-  z-index: 140;
-}
-
-html[dir="rtl"] .language-toggle-floating {
-  left: 1rem;
-}
-
-html[dir="ltr"] .language-toggle-floating {
-  right: 1rem;
-}
-
 html[dir="ltr"] .text-right {
   text-align: left !important;
 }
@@ -648,10 +726,6 @@ html[dir="ltr"] .text-left {
 
   .theme-toggle-label span:last-child {
     display: none;
-  }
-
-  .language-toggle-floating {
-    top: 0.75rem;
   }
 }
 
@@ -691,7 +765,7 @@ html[data-theme="light"] .theme-toggle-thumb {
 }
 
 .progress-bar-inner {
-  animation: progress-pulse 2s ease-in-out infinite;
+  animation: none;
 }
 
 /* Bounce slow animation */
@@ -705,5 +779,11 @@ html[data-theme="light"] .theme-toggle-thumb {
   }
 }
 .animate-bounce-slow {
-  animation: bounce-slow 3s infinite;
+  animation: none;
+}
+
+#poemsContainer > article,
+#waslatContainer > article {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
 }

@@ -1,8 +1,22 @@
 // API module for ديوان الصوفية
 import { API_BASE } from "./config.js";
 
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function removeStorage(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {}
+}
+
 async function apiFetch(path, options = {}) {
-  const token = localStorage.getItem("divan_token");
+  const token = readStorage("divan_token");
   const headers = { "Content-Type": "application/json", ...options.headers };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -14,10 +28,10 @@ async function apiFetch(path, options = {}) {
   }
 
   if (res.status === 401) {
-    localStorage.removeItem("divan_token");
-    localStorage.removeItem("divan_user");
+    removeStorage("divan_token");
+    removeStorage("divan_user");
     window.location.href = getLoginPath();
-    return;
+    return null;
   }
 
   if (!res.ok) {
@@ -130,3 +144,15 @@ export const currentApi = {
   shareWasla: (waslaId) =>
     apiFetch(`/api/current/wasla/share/${waslaId}`, { method: "POST" }),
 };
+
+// Keep-alive for Render free tier
+export function initKeepAlive() {
+  // Ping every 10 minutes
+  setInterval(async () => {
+    try {
+      await fetch(API_BASE + "/api/poems?pageSize=1");
+    } catch (e) {
+      // Silent fail
+    }
+  }, 10 * 60 * 1000);
+}

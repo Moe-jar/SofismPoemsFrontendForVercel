@@ -1,6 +1,6 @@
 // Home page logic for ديوان الصوفية
 import { requireAuth, getUser, isLead, logout } from "../auth.js";
-import { currentApi, poemsApi } from "../api.js";
+import { currentApi, poemsApi, initKeepAlive } from "../api.js";
 import { showToast } from "../ui.js";
 
 if (!requireAuth("login.html")) throw new Error("Not authenticated");
@@ -21,6 +21,9 @@ function getPoemsCountLabel(count) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const user = getUser();
+  
+  // Start keep-alive ping
+  initKeepAlive();
 
   // Display user info
   const userNameEl = document.getElementById("userName");
@@ -48,12 +51,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     else window.location.href = "pages/poems.html";
   });
 
+  // Show wake-up notice if backend is slow
+  const noticeTimer = setTimeout(() => {
+    document.getElementById("backendNotice")?.classList.remove("hidden");
+  }, 1500);
+
   // Load current poem/wasla state and featured poems in parallel
   const [poemResult, waslaResult, poemsResult] = await Promise.allSettled([
     currentApi.getPoem(),
     currentApi.getWasla(),
     poemsApi.getAll({ page: 1, pageSize: 3 }),
   ]);
+
+  clearTimeout(noticeTimer);
+  document.getElementById("backendNotice")?.classList.add("hidden");
 
   if (poemResult.status === "fulfilled") {
     renderCurrentPoem(poemResult.value);

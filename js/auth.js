@@ -4,12 +4,29 @@ import "./theme.js";
 const TOKEN_KEY = "divan_token";
 const USER_KEY = "divan_user";
 
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return readStorage(TOKEN_KEY);
 }
 
 export function getUser() {
-  const u = localStorage.getItem(USER_KEY);
+  const u = readStorage(USER_KEY);
   try {
     return u ? JSON.parse(u) : null;
   } catch {
@@ -18,13 +35,15 @@ export function getUser() {
 }
 
 export function setAuth(token, user) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  writeStorage(TOKEN_KEY, token);
+  writeStorage(USER_KEY, JSON.stringify(user));
 }
 
 export function clearAuth() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  } catch {}
 }
 
 export function isLoggedIn() {

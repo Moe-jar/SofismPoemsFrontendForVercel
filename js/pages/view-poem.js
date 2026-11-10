@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
   // Track reading progress on scroll
-  window.addEventListener("scroll", updateProgress);
+  window.addEventListener("scroll", updateProgress, { passive: true });
 });
 
 function updateBookmarkBtn(isBookmarked) {
@@ -206,16 +206,21 @@ function renderPoemBody(poem, container) {
     .join("");
 }
 
+let progressFrame = 0;
 function updateProgress() {
-  const progressBar = document.getElementById("progressBar");
-  if (!progressBar) return;
+  if (progressFrame) return;
+  progressFrame = requestAnimationFrame(() => {
+    progressFrame = 0;
+    const progressBar = document.getElementById("progressBar");
+    if (!progressBar) return;
 
-  const winScroll =
-    document.body.scrollTop || document.documentElement.scrollTop;
-  const height =
-    document.documentElement.scrollHeight -
-    document.documentElement.clientHeight;
-  const scrolled = height > 0 ? (winScroll / height) * 100 : 0;
+    const winScroll =
+      document.body.scrollTop || document.documentElement.scrollTop;
+    const height =
+      document.documentElement.scrollHeight -
+      document.documentElement.clientHeight;
+    const scrolled = height > 0 ? (winScroll / height) * 100 : 0;
 
-  progressBar.style.width = `${Math.min(scrolled, 100)}%`;
+    progressBar.style.width = `${Math.min(scrolled, 100)}%`;
+  });
 }

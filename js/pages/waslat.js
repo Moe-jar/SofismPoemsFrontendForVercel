@@ -15,6 +15,7 @@ import {
   getPoemMaqamName,
   getPoemPoetName,
   CATEGORY_LABELS,
+  buildPoemCard,
 } from "../utils.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
@@ -240,40 +241,59 @@ function buildWaslaCard(w) {
   const lead = isLead();
   return `
     <article class="glass-card rounded-2xl p-5 group hover:bg-[#1c2626]/60 transition-all
-      duration-300 hover:-translate-y-1 cursor-pointer relative overflow-hidden wasla-card"
+      duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer relative overflow-hidden wasla-card border border-white/5"
       data-id="${w.id}">
-      <div class="flex items-center gap-4">
-        <div class="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center shrink-0
-          border border-primary/30">
-          <span class="material-symbols-outlined text-primary-light text-3xl">queue_music</span>
+      <div class="absolute top-0 right-0 w-1 h-full bg-gradient-to-b from-primary/50 to-transparent
+        opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+      <div class="flex items-center gap-5">
+        <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0
+          border border-primary/20 group-hover:bg-primary/20 transition-colors">
+          <span class="material-symbols-outlined text-primary-light text-3xl group-hover:scale-110 transition-transform">queue_music</span>
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-white font-bold text-xl truncate group-hover:text-primary-light transition-colors">
+          <div class="flex items-center gap-2 mb-1">
+             <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[#9db8b6] text-[10px] font-bold uppercase tracking-wider">
+               وصلة إنشادية
+             </span>
+          </div>
+          <h3 class="text-white font-bold text-xl md:text-2xl truncate group-hover:text-primary-light transition-colors">
             ${escapeHtml(w.name)}
           </h3>
-          <p class="text-[#9db8b6] text-sm mt-1">${w.itemCount || 0} قصيدة</p>
-          ${w.description ? `<p class="text-[#9db8b6] text-xs mt-1 truncate">${escapeHtml(w.description)}</p>` : ""}
+          <div class="flex items-center gap-4 mt-2">
+            <span class="flex items-center gap-1.5 text-[#9db8b6] text-sm">
+              <span class="material-symbols-outlined text-base opacity-70">auto_stories</span>
+              ${w.itemCount || 0} قصائد
+            </span>
+            ${
+              w.description
+                ? `
+              <span class="flex items-center gap-1.5 text-[#9db8b6] text-sm truncate max-w-[200px]">
+                <span class="material-symbols-outlined text-base opacity-70">info</span>
+                ${escapeHtml(w.description)}
+              </span>`
+                : ""
+            }
+          </div>
         </div>
-        <div class="flex flex-col gap-2 shrink-0">
+        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           ${
             lead
               ? `
-            <button class="share-wasla-btn p-2 rounded-full text-[#9db8b6] hover:text-primary-light
-              hover:bg-white/5 transition-all" title="مشاركة مع الجميع"
+            <button class="share-wasla-btn p-2.5 rounded-xl text-[#9db8b6] hover:text-primary-light
+              hover:bg-primary/10 transition-all" title="مشاركة مع الجميع"
               data-id="${w.id}" data-name="${escapeHtml(w.name)}">
-              <span class="material-symbols-outlined text-lg">podcasts</span>
+              <span class="material-symbols-outlined text-xl">podcasts</span>
             </button>
-            <button class="delete-wasla-btn p-2 rounded-full text-[#9db8b6] hover:text-red-400
-              hover:bg-white/5 transition-all" title="حذف"
+            <button class="delete-wasla-btn p-2.5 rounded-xl text-[#9db8b6] hover:text-red-400
+              hover:bg-red-400/10 transition-all" title="حذف"
               data-id="${w.id}" data-name="${escapeHtml(w.name)}">
-              <span class="material-symbols-outlined text-lg">delete</span>
+              <span class="material-symbols-outlined text-xl">delete</span>
             </button>`
               : ""
           }
-          <button class="p-2 rounded-full text-[#9db8b6] hover:text-white
-            hover:bg-white/5 transition-all">
-            <span class="material-symbols-outlined rotate-180">chevron_right</span>
-          </button>
+          <div class="p-2.5 rounded-xl text-primary-light">
+            <span class="material-symbols-outlined rotate-180 text-2xl">arrow_right_alt</span>
+          </div>
         </div>
       </div>
     </article>`;
@@ -337,11 +357,37 @@ function renderWaslaDetail(wasla, container) {
       }
     </div>
 
-    <div id="waslaItemsList" class="flex flex-col gap-3">
+    <div id="waslaItemsList" class="flex flex-col gap-2">
       ${
         items.length
           ? items
-              .map((item, idx) => buildWaslaItem(item, idx, wasla.id, lead))
+              .map((item) => {
+                const poemId = getItemPoemId(item);
+                const poemData = {
+                  id: poemId,
+                  title: item?.poemTitle || item?.poem?.title || "",
+                  category:
+                    item?.poemCategory ||
+                    item?.category ||
+                    item?.poem?.category ||
+                    "",
+                  poetName:
+                    item?.poemPoetName ||
+                    item?.poem?.poetName ||
+                    item?.poem?.poet ||
+                    "",
+                  maqamName:
+                    item?.poemMaqamName ||
+                    item?.maqamName ||
+                    item?.poem?.maqamName ||
+                    "",
+                };
+                return buildPoemCard(poemData, {
+                  showDelete: lead,
+                  viewMode: "list",
+                  basePath: "../pages/",
+                });
+              })
               .join("")
           : `<div class="text-center py-8 text-[#9db8b6]">
             <span class="material-symbols-outlined text-4xl mb-2">queue_music</span>
@@ -357,7 +403,13 @@ function renderWaslaDetail(wasla, container) {
         showAddPoemToWaslaModal(wasla.id);
       });
 
-    container.querySelectorAll(".remove-item-btn").forEach((btn) => {
+    container.querySelectorAll(".delete-poem-btn").forEach((btn, idx) => {
+      // In Wasla view, the delete button is actually "Remove from Wasla"
+      const item = items[idx];
+      btn.title = "حذف من الوصلة";
+      btn.querySelector(".material-symbols-outlined").textContent =
+        "remove_circle";
+
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const confirmed = await showConfirm(
@@ -365,12 +417,11 @@ function renderWaslaDetail(wasla, container) {
         );
         if (!confirmed) return;
         try {
-          await waslatApi.removeItem(wasla.id, btn.dataset.itemId);
+          await waslatApi.removeItem(wasla.id, item.id);
           showToast("تم حذف القصيدة من الوصلة", "success");
           const updated = await waslatApi.getById(wasla.id);
-          const items = await enrichWaslaItems(updated.items || []);
-          renderWaslaDetail({ ...updated, items }, container);
-          // Reload waslat list to update count
+          const enriched = await enrichWaslaItems(updated.items || []);
+          renderWaslaDetail({ ...updated, items: enriched }, container);
           loadWaslat();
         } catch (err) {
           showToast(err.message, "error");
@@ -378,127 +429,14 @@ function renderWaslaDetail(wasla, container) {
       });
     });
   }
-}
 
-function buildWaslaItem(item, idx, waslaId, lead) {
-  const poemId = getItemPoemId(item);
-  const poem = {
-    id: poemId,
-    title: item?.poemTitle || item?.poem?.title || "",
-    category:
-      item?.poemCategory || item?.category || item?.poem?.category || "",
-    poetName:
-      item?.poemPoetName || item?.poem?.poetName || item?.poem?.poet || "",
-    poet: item?.poemPoet || item?.poet || item?.poem?.poet,
-    maqamName:
-      item?.poemMaqamName || item?.maqamName || item?.poem?.maqamName || "",
-    maqam: item?.poemMaqam || item?.maqam || item?.poem?.maqam,
-  };
-  let maqamName = getPoemMaqamName(poem);
-  if (!maqamName) {
-    const maqamId =
-      item?.poemMaqamId ??
-      item?.maqamId ??
-      item?.maqamID ??
-      item?.maqam_id ??
-      item?.poem?.maqamId ??
-      item?.poem?.maqamID ??
-      item?.poem?.maqam_id ??
-      extractId(item?.maqam) ??
-      extractId(item?.poem?.maqam);
-    maqamName = getNameFromMap(maqamNameById, maqamId);
-  }
-
-  let poetName = getPoemPoetName(poem);
-  if (!poetName) {
-    const poetId =
-      item?.poemPoetId ??
-      item?.poetId ??
-      item?.poetID ??
-      item?.poet_id ??
-      item?.poem?.poetId ??
-      item?.poem?.poetID ??
-      item?.poem?.poet_id ??
-      extractId(item?.poet) ??
-      extractId(item?.poem?.poet);
-    poetName = getNameFromMap(poetNameById, poetId);
-  }
-  const categoryLabel = CATEGORY_LABELS[poem.category] || poem.category || "";
-  const maqamColor = maqamName
-    ? getMaqamColor(maqamName)
-    : {
-        bg: "rgba(10,87,80,0.3)",
-        border: "rgba(21,140,130,0.4)",
-        text: "#4ecdc4",
-      };
-  const readLink = poemId ? `view-poem.html?id=${poemId}` : "#";
-  const readLinkClass = poemId ? "" : "pointer-events-none opacity-60";
-  return `
-    <article class="glass-card rounded-2xl p-5 group hover:bg-[#1c2626]/60 transition-all
-      duration-300 hover:shadow-lg hover:-translate-y-1 relative overflow-hidden">
-      <div class="absolute top-0 right-0 w-1 h-full bg-gradient-to-b from-primary/50 to-transparent
-        opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-
-      <div class="flex items-start justify-between gap-4">
-        <div class="flex-1 flex flex-col gap-2 min-w-0">
-          <div class="flex flex-wrap items-center gap-2 mb-1">
-            ${
-              maqamName
-                ? `
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tracking-wide"
-                style="background:${maqamColor.bg};border:1px solid ${maqamColor.border};color:${maqamColor.text};">
-                <span class="w-1.5 h-1.5 rounded-full" style="background:${maqamColor.text};"></span>
-                مقام ${escapeHtml(maqamName)}
-              </span>`
-                : ""
-            }
-            ${
-              categoryLabel
-                ? `
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/5
-                border border-white/10 text-[#9db8b6] text-xs">${escapeHtml(categoryLabel)}</span>`
-                : ""
-            }
-          </div>
-          <h3 class="text-white text-xl md:text-2xl font-serif font-bold leading-normal
-            group-hover:text-primary-light transition-colors">
-            ${escapeHtml(poem.title || "")}
-          </h3>
-          ${
-            poetName
-              ? `
-            <p class="text-[#9db8b6] text-sm font-medium flex items-center gap-2 mt-1">
-              <span class="material-symbols-outlined text-base opacity-70">edit</span>
-              ${escapeHtml(poetName)}
-            </p>`
-              : ""
-          }
-        </div>
-      </div>
-
-      <div class="mt-4 pt-4 border-t border-white/5 flex flex-wrap items-center
-        justify-between text-xs text-[#6b8c89] gap-3">
-        <div class="flex items-center gap-3">
-          ${
-            lead
-              ? `
-            <button class="remove-item-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-              bg-white/5 hover:bg-red-400/20 hover:text-red-300 transition-colors text-[#9db8b6]"
-              title="حذف من الوصلة" data-item-id="${item.id}">
-              <span class="material-symbols-outlined text-lg">remove_circle</span>
-              <span class="font-medium">حذف من الوصلة</span>
-            </button>`
-              : ""
-          }
-        </div>
-        <a href="${readLink}"
-          class="flex items-center gap-1 text-primary-light font-bold hover:underline ${readLinkClass}"
-          onclick="event.stopPropagation()">
-          اقرأ القصيدة
-          <span class="material-symbols-outlined text-sm rotate-180">arrow_right_alt</span>
-        </a>
-      </div>
-    </article>`;
+  // Navigate on item click
+  container.querySelectorAll("article[data-id]").forEach((article) => {
+    article.addEventListener("click", (e) => {
+      if (e.target.closest("button") || e.target.closest("a")) return;
+      window.location.href = `view-poem.html?id=${article.dataset.id}`;
+    });
+  });
 }
 
 async function showAddPoemToWaslaModal(waslaId) {

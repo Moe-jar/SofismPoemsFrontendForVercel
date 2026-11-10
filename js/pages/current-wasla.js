@@ -37,6 +37,13 @@ function cleanupLiveUpdates() {
 }
 
 window.addEventListener("pagehide", cleanupLiveUpdates);
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  unsubscribeWaslaUpdates = on("currentWaslaUpdated", (state) => {
+    if (state?.wasla?.id !== lastWaslaId) loadCurrentWasla();
+  });
+  startPolling(null, () => currentApi.getWasla());
+});
 
 async function loadCurrentWasla() {
   const container = document.getElementById("waslaContainer");

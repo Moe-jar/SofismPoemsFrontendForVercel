@@ -2,7 +2,7 @@
 import { requireAuth, isLead } from "../auth.js";
 import { currentApi } from "../api.js";
 import { showToast } from "../ui.js";
-import { escapeHtml, getPoemMaqamName, getPoemPoetName } from "../utils.js";
+import { escapeHtml, getPoemMaqamName, getPoemPoetName, parseDate } from "../utils.js";
 import { startPolling, stopPolling, on } from "../signalr.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
@@ -43,6 +43,13 @@ function cleanupLiveUpdates() {
 }
 
 window.addEventListener("pagehide", cleanupLiveUpdates);
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  unsubscribePoemUpdates = on("currentPoemUpdated", (state) => {
+    if (state?.poem?.id !== lastPoemId) loadCurrentPoem();
+  });
+  startPolling(() => currentApi.getPoem(), null);
+});
 
 async function loadCurrentPoem() {
   const container = document.getElementById("poemContainer");
@@ -90,13 +97,13 @@ function renderPoem(state) {
   }
   if (sharedByEl) sharedByEl.textContent = state.sharedByName || "";
   if (sharedAtEl && state.sharedAt) {
-    sharedAtEl.textContent = new Date(state.sharedAt).toLocaleTimeString(
-      "ar-SA",
-      {
+    const sharedAt = parseDate(state.sharedAt);
+    if (sharedAt) {
+      sharedAtEl.textContent = sharedAt.toLocaleTimeString("ar-SA", {
         hour: "2-digit",
         minute: "2-digit",
-      },
-    );
+      });
+    }
   }
 
   // Render poem body

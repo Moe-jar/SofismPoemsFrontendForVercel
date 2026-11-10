@@ -16,6 +16,7 @@ import {
   getPoemPoetName,
   CATEGORY_LABELS,
   HADRA_SECTION_LABELS,
+  buildPoemCard,
 } from "../utils.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
@@ -23,6 +24,7 @@ if (!requireAuth()) throw new Error("Not authenticated");
 let currentPage = 1;
 const pageSize = 10;
 let totalPages = 1;
+let viewMode = localStorage.getItem("divan_poems_view_mode") || "card";
 let filters = {
   q: "",
   poetId: "",
@@ -249,8 +251,43 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   syncCategoryUI();
   syncHadraDropdownUI();
+  setupViewToggle();
   await loadPoems();
 });
+
+function setupViewToggle() {
+  const gridBtn = document.getElementById("viewGridBtn");
+  const listBtn = document.getElementById("viewListBtn");
+
+  const updateBtns = () => {
+    if (gridBtn) {
+      gridBtn.classList.toggle("bg-primary/20", viewMode === "card");
+      gridBtn.classList.toggle("text-primary-light", viewMode === "card");
+    }
+    if (listBtn) {
+      listBtn.classList.toggle("bg-primary/20", viewMode === "list");
+      listBtn.classList.toggle("text-primary-light", viewMode === "list");
+    }
+  };
+
+  gridBtn?.addEventListener("click", () => {
+    if (viewMode === "card") return;
+    viewMode = "card";
+    localStorage.setItem("divan_poems_view_mode", "card");
+    updateBtns();
+    renderPoemsList();
+  });
+
+  listBtn?.addEventListener("click", () => {
+    if (viewMode === "list") return;
+    viewMode = "list";
+    localStorage.setItem("divan_poems_view_mode", "list");
+    updateBtns();
+    renderPoemsList();
+  });
+
+  updateBtns();
+}
 
 async function loadPoets() {
   const select = document.getElementById("poetFilter");
@@ -298,6 +335,8 @@ async function loadMaqamat() {
   } catch {}
 }
 
+let lastPoemsResult = [];
+
 async function loadPoems() {
   const container = document.getElementById("poemsContainer");
   if (!container) return;
@@ -318,8 +357,8 @@ async function loadPoems() {
           : undefined,
     });
 
-    const poems = result?.items || result || [];
-    const total = result?.totalCount || poems.length;
+    lastPoemsResult = result?.items || result || [];
+    const total = result?.totalCount || lastPoemsResult.length;
     totalPages =
       result?.totalPages || Math.max(1, Math.ceil(total / pageSize));
 
@@ -327,150 +366,39 @@ async function loadPoems() {
     const countEl = document.getElementById("poemsCount");
     if (countEl) countEl.textContent = `${total} قصيدة`;
 
-    if (!poems.length) {
-      showEmpty("poemsContainer", "لا توجد قصائد تطابق البحث", "search_off");
-      renderPagination();
-      return;
-    }
-
-    container.innerHTML = poems.map((poem) => buildPoemCard(poem)).join("");
-    setupCardActions(container);
+    renderPoemsList();
     renderPagination();
   } catch (err) {
     container.innerHTML = `<div class="text-center py-12 text-red-400">${escapeHtml(err.message)}</div>`;
   }
 }
 
-function buildPoemCard(poem) {
-  let maqamName = getPoemMaqamName(poem);
-  if (!maqamName) {
-    const maqamId =
-      poem?.maqamId ??
-      poem?.maqamID ??
-      poem?.maqam_id ??
-      extractId(poem?.maqam);
-    maqamName = getNameFromMap(maqamNameById, maqamId);
+function renderPoemsList() {
+  const container = document.getElementById("poemsContainer");
+  if (!container) return;
+
+  if (!lastPoemsResult.length) {
+    showEmpty("poemsContainer", "لا توجد قصائد تطابق البحث", "search_off");
+    return;
   }
 
-  let poetName = getPoemPoetName(poem);
-  if (!poetName) {
-    const poetId =
-      poem?.poetId ?? poem?.poetID ?? poem?.poet_id ?? extractId(poem?.poet);
-    poetName = getNameFromMap(poetNameById, poetId);
-  }
-  const maqamColor = maqamName
-    ? getMaqamColor(maqamName)
-    : {
-        bg: "rgba(10,87,80,0.3)",
-        border: "rgba(21,140,130,0.4)",
-        text: "#4ecdc4",
-      };
-  const categoryLabel = CATEGORY_LABELS[poem.category] || poem.category || "";
-  const hadraSectionLabel = getHadraSectionLabel(poem);
-  const isHadra = String(poem.category || "").toLowerCase() === "hadra";
   const lead = isLead();
+  container.className =
+    viewMode === "list" ? "flex flex-col gap-2" : "flex flex-col gap-4";
 
-  return `
-    <article class="glass-card rounded-2xl p-5 group hover:bg-[#1c2626]/60 transition-all
-      duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer relative overflow-hidden"
-      data-id="${poem.id}">
-      <div class="absolute top-0 right-0 w-1 h-full bg-gradient-to-b from-primary/50 to-transparent
-        opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-
-      <div class="flex items-start justify-between gap-4">
-        <div class="flex-1 flex flex-col gap-2 min-w-0">
-          <div class="flex flex-wrap items-center gap-2 mb-1">
-            ${
-              maqamName
-                ? `
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tracking-wide"
-                style="background:${maqamColor.bg};border:1px solid ${maqamColor.border};color:${maqamColor.text};">
-                <span class="w-1.5 h-1.5 rounded-full" style="background:${maqamColor.text};"></span>
-                مقام ${escapeHtml(maqamName)}
-              </span>`
-                : ""
-            }
-            ${
-              categoryLabel
-                ? `
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/5
-                border border-white/10 text-[#9db8b6] text-xs">${escapeHtml(categoryLabel)}</span>`
-                : ""
-            }
-            ${
-              isHadra && hadraSectionLabel
-                ? `
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/5
-                border border-white/10 text-[#c9a5ea] text-xs">${escapeHtml(hadraSectionLabel)}</span>`
-                : ""
-            }
-          </div>
-          <h3 class="text-white text-xl md:text-2xl font-serif font-bold leading-normal
-            group-hover:text-primary-light transition-colors">
-            ${escapeHtml(poem.title)}
-          </h3>
-          ${
-            poetName
-              ? `
-            <p class="text-[#9db8b6] text-sm font-medium flex items-center gap-2 mt-1">
-              <span class="material-symbols-outlined text-base opacity-70">edit</span>
-              ${escapeHtml(poetName)}
-            </p>`
-              : ""
-          }
-        </div>
-        <div class="flex flex-col items-center gap-2 shrink-0">
-          <button class="bookmark-btn text-[#9db8b6] hover:text-yellow-400 hover:bg-white/5
-            p-2 rounded-full transition-all" title="إشارة مرجعية" data-id="${poem.id}">
-            <span class="material-symbols-outlined">bookmark</span>
-          </button>
-          ${
-            lead
-              ? `
-            <button class="delete-poem-btn text-[#9db8b6] hover:text-red-400 hover:bg-white/5
-              p-2 rounded-full transition-all" title="حذف" data-id="${poem.id}" data-title="${escapeHtml(poem.title)}">
-              <span class="material-symbols-outlined">delete</span>
-            </button>`
-              : ""
-          }
-        </div>
-      </div>
-
-      <div class="mt-4 pt-4 border-t border-white/5 flex flex-wrap items-center
-        justify-between text-xs text-[#6b8c89] gap-3">
-        <div class="flex items-center gap-3">
-          ${
-            lead
-              ? `
-            <button class="share-poem-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-              bg-white/5 hover:bg-primary/20 hover:text-primary-light transition-colors text-[#9db8b6]"
-              data-id="${poem.id}" data-title="${escapeHtml(poem.title)}">
-              <span class="material-symbols-outlined text-lg">podcasts</span>
-              <span class="font-medium">عرض للجميع</span>
-            </button>
-            <button class="add-to-wasla-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-              bg-white/5 hover:bg-primary/20 hover:text-primary-light transition-colors text-[#9db8b6]"
-              data-id="${poem.id}" data-title="${escapeHtml(poem.title)}">
-              <span class="material-symbols-outlined text-lg">playlist_add</span>
-              <span class="font-medium">إضافة للوصلة</span>
-            </button>
-            <button class="edit-poem-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-              bg-white/5 hover:bg-primary/20 hover:text-primary-light transition-colors text-[#9db8b6]"
-              data-id="${poem.id}">
-              <span class="material-symbols-outlined text-lg">edit</span>
-              <span class="font-medium">تعديل</span>
-            </button>`
-              : ""
-          }
-        </div>
-        <a href="view-poem.html?id=${poem.id}"
-          class="flex items-center gap-1 text-primary-light font-bold hover:underline"
-          onclick="event.stopPropagation()">
-          اقرأ القصيدة
-          <span class="material-symbols-outlined text-sm rotate-180">arrow_right_alt</span>
-        </a>
-      </div>
-    </article>`;
+  container.innerHTML = lastPoemsResult
+    .map((poem) =>
+      buildPoemCard(poem, {
+        showShare: lead,
+        showAddToWasla: lead,
+        showEdit: lead,
+        showDelete: lead,
+        searchQuery: filters.q,
+        viewMode: viewMode,
+      }),
+    )
+    .join("");
+  setupCardActions(container);
 }
 
 function setupCardActions(container) {
@@ -658,8 +586,20 @@ function renderPagination() {
     return;
   }
 
+  const maxVisiblePages = 10;
+  const firstVisiblePage = Math.max(
+    1,
+    Math.min(
+      currentPage - Math.floor(maxVisiblePages / 2),
+      totalPages - maxVisiblePages + 1,
+    ),
+  );
+  const lastVisiblePage = Math.min(
+    totalPages,
+    firstVisiblePage + maxVisiblePages - 1,
+  );
   const pages = [];
-  for (let i = 1; i <= totalPages; i++) {
+  for (let i = firstVisiblePage; i <= lastVisiblePage; i++) {
     pages.push(`
       <button data-page="${i}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all
         ${
@@ -675,12 +615,14 @@ function renderPagination() {
     <div class="flex items-center gap-2 flex-wrap justify-center">
       <button id="prevPage" class="px-3 py-1.5 rounded-lg bg-white/5 text-[#9db8b6]
         hover:bg-white/10 hover:text-white transition-all text-sm disabled:opacity-30 disabled:pointer-events-none"
+        aria-label="الصفحة السابقة"
         ${currentPage === 1 ? "disabled" : ""}>
         <span class="material-symbols-outlined text-lg">chevron_right</span>
       </button>
       ${pages.join("")}
       <button id="nextPage" class="px-3 py-1.5 rounded-lg bg-white/5 text-[#9db8b6]
         hover:bg-white/10 hover:text-white transition-all text-sm disabled:opacity-30 disabled:pointer-events-none"
+        aria-label="الصفحة التالية"
         ${currentPage === totalPages ? "disabled" : ""}>
         <span class="material-symbols-outlined text-lg">chevron_left</span>
       </button>
