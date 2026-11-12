@@ -33,16 +33,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (q) window.location.href = "pages/poems.html?q=".concat(encodeURIComponent(q));
     else window.location.href = "pages/poems.html";
   });
-  const noticeTimer = setTimeout(() => {
-    var _a2;
-    (_a2 = document.getElementById("backendNotice")) == null ? void 0 : _a2.classList.remove("hidden");
-  }, 1500);
   const [poemResult, waslaResult, poemsResult] = await Promise.allSettled([
     currentApi.getPoem(),
     currentApi.getWasla(),
     poemsApi.getAll({ page: 1, pageSize: 3 })
   ]);
-  clearTimeout(noticeTimer);
   (_c = document.getElementById("backendNotice")) == null ? void 0 : _c.classList.add("hidden");
   if (poemResult.status === "fulfilled") {
     renderCurrentPoem(poemResult.value);

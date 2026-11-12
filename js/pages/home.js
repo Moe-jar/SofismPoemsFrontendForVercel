@@ -51,11 +51,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     else window.location.href = "pages/poems.html";
   });
 
-  // Show wake-up notice if backend is slow
-  const noticeTimer = setTimeout(() => {
-    document.getElementById("backendNotice")?.classList.remove("hidden");
-  }, 1500);
-
   // Load current poem/wasla state and featured poems in parallel
   const [poemResult, waslaResult, poemsResult] = await Promise.allSettled([
     currentApi.getPoem(),
@@ -63,7 +58,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     poemsApi.getAll({ page: 1, pageSize: 3 }),
   ]);
 
-  clearTimeout(noticeTimer);
   document.getElementById("backendNotice")?.classList.add("hidden");
 
   if (poemResult.status === "fulfilled") {

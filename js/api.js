@@ -20,31 +20,52 @@ async function apiFetch(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...options.headers };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  let res;
-  try {
-    res = await fetch(API_BASE + path, { ...options, headers });
-  } catch (err) {
-    throw new Error("تعذر الاتصال بالخادم. تأكد من تشغيل الواجهة الخلفية.");
-  }
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const wakeTimer = setTimeout(() => {
+      const notice = document.getElementById("backendNotice");
+      if (notice) notice.classList.remove("hidden");
+    }, 5000);
+    const timeoutTimer = setTimeout(() => controller.abort(), 60000);
 
-  if (res.status === 401) {
-    removeStorage("divan_token");
-    removeStorage("divan_user");
-    window.location.href = getLoginPath();
-    return null;
-  }
-
-  if (!res.ok) {
-    let errMsg = res.statusText;
     try {
-      const err = await res.json();
-      errMsg = err.error || err.title || err.message || errMsg;
-    } catch {}
-    throw new Error(errMsg);
-  }
+      const res = await fetch(API_BASE + path, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
 
-  if (res.status === 204) return null;
-  return res.json();
+      if (res.status === 401) {
+        removeStorage("divan_token");
+        removeStorage("divan_user");
+        window.location.href = getLoginPath();
+        return null;
+      }
+
+      if (!res.ok) {
+        let errMsg = res.statusText;
+        try {
+          const err = await res.json();
+          errMsg = err.error || err.title || err.message || errMsg;
+        } catch {}
+        throw new Error(errMsg);
+      }
+
+      if (res.status === 204) return null;
+      return await res.json();
+    } catch (err) {
+      if (err.name === "AbortError") {
+        throw new Error("انتهت مهلة الاتصال بالخادم. يرجى المحاولة مرة أخرى.");
+      }
+      if (attempt === 0 && err.name === "TypeError") continue;
+      throw new Error("تعذر الاتصال بالخادم. تأكد من تشغيل الواجهة الخلفية.");
+    } finally {
+      clearTimeout(wakeTimer);
+      clearTimeout(timeoutTimer);
+      const notice = document.getElementById("backendNotice");
+      if (notice) notice.classList.add("hidden");
+    }
+  }
 }
 
 function getLoginPath() {

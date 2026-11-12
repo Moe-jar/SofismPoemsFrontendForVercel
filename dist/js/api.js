@@ -16,29 +16,49 @@ async function apiFetch(path, options = {}) {
   const token = readStorage("divan_token");
   const headers = { "Content-Type": "application/json", ...options.headers };
   if (token) headers["Authorization"] = "Bearer ".concat(token);
-  let res;
-  try {
-    res = await fetch(API_BASE + path, { ...options, headers });
-  } catch (err) {
-    throw new Error("\u062A\u0639\u0630\u0631 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u0627\u0644\u062E\u0627\u062F\u0645. \u062A\u0623\u0643\u062F \u0645\u0646 \u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u0648\u0627\u062C\u0647\u0629 \u0627\u0644\u062E\u0644\u0641\u064A\u0629.");
-  }
-  if (res.status === 401) {
-    removeStorage("divan_token");
-    removeStorage("divan_user");
-    window.location.href = getLoginPath();
-    return null;
-  }
-  if (!res.ok) {
-    let errMsg = res.statusText;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const wakeTimer = setTimeout(() => {
+      const notice = document.getElementById("backendNotice");
+      if (notice) notice.classList.remove("hidden");
+    }, 5e3);
+    const timeoutTimer = setTimeout(() => controller.abort(), 6e4);
     try {
-      const err = await res.json();
-      errMsg = err.error || err.title || err.message || errMsg;
-    } catch {
+      const res = await fetch(API_BASE + path, {
+        ...options,
+        headers,
+        signal: controller.signal
+      });
+      if (res.status === 401) {
+        removeStorage("divan_token");
+        removeStorage("divan_user");
+        window.location.href = getLoginPath();
+        return null;
+      }
+      if (!res.ok) {
+        let errMsg = res.statusText;
+        try {
+          const err = await res.json();
+          errMsg = err.error || err.title || err.message || errMsg;
+        } catch {
+        }
+        throw new Error(errMsg);
+      }
+      if (res.status === 204) return null;
+      return await res.json();
+    } catch (err) {
+      if (err.name === "AbortError") {
+        throw new Error("\u0627\u0646\u062A\u0647\u062A \u0645\u0647\u0644\u0629 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u0627\u0644\u062E\u0627\u062F\u0645. \u064A\u0631\u062C\u0649 \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062E\u0631\u0649.");
+      }
+      if (attempt === 0 && err.name === "TypeError") continue;
+      throw new Error("\u062A\u0639\u0630\u0631 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u0627\u0644\u062E\u0627\u062F\u0645. \u062A\u0623\u0643\u062F \u0645\u0646 \u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u0648\u0627\u062C\u0647\u0629 \u0627\u0644\u062E\u0644\u0641\u064A\u0629.");
+    } finally {
+      clearTimeout(wakeTimer);
+      clearTimeout(timeoutTimer);
+      const notice = document.getElementById("backendNotice");
+      if (notice) notice.classList.add("hidden");
     }
-    throw new Error(errMsg);
   }
-  if (res.status === 204) return null;
-  return res.json();
 }
 function getLoginPath() {
   const path = window.location.pathname;
