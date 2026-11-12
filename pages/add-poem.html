@@ -3,6 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script>
+      (function () {
+        if (!/[?&]debug=1(?:&|$)/.test(window.location.search)) return;
+        function showError(message) {
+          var overlay = document.createElement("pre");
+          overlay.id = "debug-error-overlay";
+          overlay.style.cssText = "position:fixed;z-index:2147483647;inset:0;overflow:auto;margin:0;padding:16px;background:#240b0b;color:#ffb4b4;font:14px/1.5 monospace;white-space:pre-wrap;";
+          overlay.textContent = message;
+          (document.body || document.documentElement).appendChild(overlay);
+        }
+        window.onerror = function (message, source, line, column, error) {
+          showError("JavaScript error: " + message + "\n" + source + ":" + line + ":" + column + (error && error.stack ? "\n\n" + error.stack : ""));
+        };
+        window.addEventListener("unhandledrejection", function (event) {
+          var reason = event.reason;
+          showError("Unhandled promise rejection:\n" + (reason && reason.stack ? reason.stack : String(reason)));
+        });
+      }());
+    </script>
     <title data-i18n="pages.addPoemTitle">إضافة قصيدة - ديوان الصوفية</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -411,5 +430,11 @@
     </div>
 
     <script type="module" src="../js/pages/add-poem.js"></script>
+    <noscript>
+      This site requires JavaScript. هذا الموقع يحتاج إلى JavaScript. Please enable JavaScript or update iOS/Safari. يرجى تحديث iOS أو Safari.
+    </noscript>
+    <script nomodule>
+      document.body.insertAdjacentHTML("afterbegin", '<div style="padding:16px;background:#240b0b;color:#fff;font:16px/1.5 sans-serif;text-align:center;">Your browser is too old for this site. Please update iOS/Safari. متصفحك قديم لتشغيل الموقع. يرجى تحديث iOS أو Safari.</div>');
+    </script>
   </body>
 </html>
