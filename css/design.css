@@ -240,6 +240,10 @@ html[data-theme="light"] .animate-float-delay {
 .glass-panel::before {
   content: "";
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   pointer-events: none;
   background: linear-gradient(
@@ -563,6 +567,55 @@ a,
   font-size: 0.65rem;
   font-family: var(--theme-font-display);
   font-weight: 600;
+}
+
+/* Flex gap is unsupported on older iOS Safari. */
+@supports not (gap: 1rem) {
+  .flex.flex-col.gap-1 > * + *,
+  .bottom-nav-item > * + * {
+    margin-top: 0.25rem;
+  }
+
+  .flex.flex-col.gap-2 > * + * {
+    margin-top: 0.5rem;
+  }
+
+  .flex.flex-col.gap-3 > * + * {
+    margin-top: 0.75rem;
+  }
+
+  .flex.flex-col.gap-4 > * + * {
+    margin-top: 1rem;
+  }
+
+  .flex.flex-col.gap-6 > * + * {
+    margin-top: 1.5rem;
+  }
+
+  .flex:not(.flex-col).gap-1 > * + *,
+  .theme-toggle > * + * {
+    margin-left: 0.25rem;
+  }
+
+  .flex:not(.flex-col).gap-2 > * + * {
+    margin-left: 0.5rem;
+  }
+
+  .flex:not(.flex-col).gap-3 > * + * {
+    margin-left: 0.75rem;
+  }
+
+  .flex:not(.flex-col).gap-4 > * + * {
+    margin-left: 1rem;
+  }
+
+  .flex:not(.flex-col).gap-6 > * + * {
+    margin-left: 1.5rem;
+  }
+
+  #toast-container > * + * {
+    margin-top: 0.5rem;
+  }
 }
 
 .bottom-nav-item.active {
