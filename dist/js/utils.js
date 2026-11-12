@@ -44,6 +44,16 @@ function debounce(fn, delay = 300) {
     timer = setTimeout(() => fn(...args), delay);
   };
 }
+function promiseAllSettled(promises) {
+  return Promise.all(
+    promises.map(
+      (promise) => Promise.resolve(promise).then(
+        (value) => ({ status: "fulfilled", value }),
+        (reason) => ({ status: "rejected", reason })
+      )
+    )
+  );
+}
 function parseDate(dateStr) {
   if (!dateStr) return null;
   if (dateStr instanceof Date) {
@@ -169,5 +179,6 @@ export {
   getPoemPoetName,
   highlightText,
   normalizeArabic,
-  parseDate
+  parseDate,
+  promiseAllSettled
 };

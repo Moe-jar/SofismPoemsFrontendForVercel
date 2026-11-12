@@ -64,6 +64,17 @@ export function debounce(fn, delay = 300) {
   };
 }
 
+export function promiseAllSettled(promises) {
+  return Promise.all(
+    promises.map((promise) =>
+      Promise.resolve(promise).then(
+        (value) => ({ status: "fulfilled", value }),
+        (reason) => ({ status: "rejected", reason }),
+      ),
+    ),
+  );
+}
+
 // Safari rejects "YYYY-MM-DD HH:mm:ss" (space instead of T) and returns Invalid Date.
 export function parseDate(dateStr) {
   if (!dateStr) return null;

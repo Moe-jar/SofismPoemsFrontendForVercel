@@ -17,6 +17,7 @@ import {
   CATEGORY_LABELS,
   HADRA_SECTION_LABELS,
   buildPoemCard,
+  promiseAllSettled,
 } from "../utils.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
@@ -191,7 +192,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupHadraDropdown();
 
   // Load filters data
-  await Promise.allSettled([loadPoets(), loadMaqamat()]);
+  await promiseAllSettled([loadPoets(), loadMaqamat()]);
 
   // Parse URL params
   const params = new URLSearchParams(window.location.search);

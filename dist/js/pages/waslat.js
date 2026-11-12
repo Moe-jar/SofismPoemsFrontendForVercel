@@ -14,7 +14,8 @@ import {
   getPoemMaqamName,
   getPoemPoetName,
   CATEGORY_LABELS,
-  buildPoemCard
+  buildPoemCard,
+  promiseAllSettled
 } from "../utils.js";
 if (!requireAuth()) throw new Error("Not authenticated");
 let waslat = [];
@@ -80,7 +81,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.querySelectorAll(".lead-only").forEach((el) => el.classList.remove("hidden"));
   }
   (_a = document.getElementById("createWaslaBtn")) == null ? void 0 : _a.addEventListener("click", () => showCreateWaslaModal());
-  await Promise.allSettled([loadPoets(), loadMaqamat()]);
+  await promiseAllSettled([loadPoets(), loadMaqamat()]);
   await loadWaslat();
   if (shouldOpenCurrentWasla) {
     await openCurrentWaslaFromQuery();

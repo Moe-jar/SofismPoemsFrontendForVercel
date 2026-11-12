@@ -2,7 +2,7 @@
 import { requireLead } from "../auth.js";
 import { poemsApi, poetsApi, maqamatApi } from "../api.js";
 import { showToast } from "../ui.js";
-import { escapeHtml, CATEGORY_LABELS } from "../utils.js";
+import { escapeHtml, CATEGORY_LABELS, promiseAllSettled } from "../utils.js";
 
 if (!requireLead()) throw new Error("Not authorized");
 
@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   editId = params.get("id");
 
   // Load poets and maqamat in parallel
-  await Promise.allSettled([loadPoets(), loadMaqamat()]);
+  await promiseAllSettled([loadPoets(), loadMaqamat()]);
 
   if (editId) {
     document.getElementById("pageTitle").textContent = "تعديل قصيدة";

@@ -15,7 +15,8 @@ import {
   getPoemPoetName,
   CATEGORY_LABELS,
   HADRA_SECTION_LABELS,
-  buildPoemCard
+  buildPoemCard,
+  promiseAllSettled
 } from "../utils.js";
 if (!requireAuth()) throw new Error("Not authenticated");
 let currentPage = 1;
@@ -144,7 +145,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   setupAddToWaslaModal();
   setupHadraDropdown();
-  await Promise.allSettled([loadPoets(), loadMaqamat()]);
+  await promiseAllSettled([loadPoets(), loadMaqamat()]);
   const params = new URLSearchParams(window.location.search);
   filters.q = params.get("q") || "";
   filters.category = params.get("category") || "";

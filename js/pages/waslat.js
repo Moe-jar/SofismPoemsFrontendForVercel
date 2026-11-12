@@ -16,6 +16,7 @@ import {
   getPoemPoetName,
   CATEGORY_LABELS,
   buildPoemCard,
+  promiseAllSettled,
 } from "../utils.js";
 
 if (!requireAuth()) throw new Error("Not authenticated");
@@ -106,7 +107,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     .getElementById("createWaslaBtn")
     ?.addEventListener("click", () => showCreateWaslaModal());
 
-  await Promise.allSettled([loadPoets(), loadMaqamat()]);
+  await promiseAllSettled([loadPoets(), loadMaqamat()]);
 
   // Load waslat list
   await loadWaslat();

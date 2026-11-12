@@ -1,14 +1,14 @@
 import { requireLead } from "../auth.js";
 import { poemsApi, poetsApi, maqamatApi } from "../api.js";
 import { showToast } from "../ui.js";
-import { escapeHtml, CATEGORY_LABELS } from "../utils.js";
+import { escapeHtml, CATEGORY_LABELS, promiseAllSettled } from "../utils.js";
 if (!requireLead()) throw new Error("Not authorized");
 let editId = null;
 document.addEventListener("DOMContentLoaded", async () => {
   var _a, _b, _c, _d;
   const params = new URLSearchParams(window.location.search);
   editId = params.get("id");
-  await Promise.allSettled([loadPoets(), loadMaqamat()]);
+  await promiseAllSettled([loadPoets(), loadMaqamat()]);
   if (editId) {
     document.getElementById("pageTitle").textContent = "\u062A\u0639\u062F\u064A\u0644 \u0642\u0635\u064A\u062F\u0629";
     document.getElementById("submitBtn").innerHTML = '\n      <span class="material-symbols-outlined text-lg">save</span> \u062D\u0641\u0638 \u0627\u0644\u062A\u0639\u062F\u064A\u0644\u0627\u062A';

@@ -2,6 +2,7 @@
 import { requireAuth, getUser, isLead, logout } from "../auth.js";
 import { currentApi, poemsApi, initKeepAlive } from "../api.js";
 import { showToast } from "../ui.js";
+import { promiseAllSettled } from "../utils.js";
 
 if (!requireAuth("login.html")) throw new Error("Not authenticated");
 
@@ -52,7 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Load current poem/wasla state and featured poems in parallel
-  const [poemResult, waslaResult, poemsResult] = await Promise.allSettled([
+  const [poemResult, waslaResult, poemsResult] = await promiseAllSettled([
     currentApi.getPoem(),
     currentApi.getWasla(),
     poemsApi.getAll({ page: 1, pageSize: 3 }),

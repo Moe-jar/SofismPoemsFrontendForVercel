@@ -1,6 +1,7 @@
 import { requireAuth, getUser, isLead, logout } from "../auth.js";
 import { currentApi, poemsApi, initKeepAlive } from "../api.js";
 import { showToast } from "../ui.js";
+import { promiseAllSettled } from "../utils.js";
 if (!requireAuth("login.html")) throw new Error("Not authenticated");
 function isEnglish() {
   return document.documentElement.getAttribute("lang") === "en";
@@ -33,7 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (q) window.location.href = "pages/poems.html?q=".concat(encodeURIComponent(q));
     else window.location.href = "pages/poems.html";
   });
-  const [poemResult, waslaResult, poemsResult] = await Promise.allSettled([
+  const [poemResult, waslaResult, poemsResult] = await promiseAllSettled([
     currentApi.getPoem(),
     currentApi.getWasla(),
     poemsApi.getAll({ page: 1, pageSize: 3 })
