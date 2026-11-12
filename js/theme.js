@@ -303,8 +303,12 @@ const AUTO_UI_TEXT_AR_TO_EN = {
   "جميع الحقوق محفوظة": "All rights reserved",
 };
 
-const AUTO_UI_TEXT_EN_TO_AR = Object.fromEntries(
-  Object.entries(AUTO_UI_TEXT_AR_TO_EN).map(([ar, en]) => [en, ar]),
+const AUTO_UI_TEXT_EN_TO_AR = Object.entries(AUTO_UI_TEXT_AR_TO_EN).reduce(
+  (result, [ar, en]) => {
+    result[en] = ar;
+    return result;
+  },
+  {},
 );
 
 const AUTO_UI_AR_ENTRIES = Object.entries(AUTO_UI_TEXT_AR_TO_EN).sort(

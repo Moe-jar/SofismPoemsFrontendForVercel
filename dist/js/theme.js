@@ -292,8 +292,12 @@ const AUTO_UI_TEXT_AR_TO_EN = {
   "\u062D\u062F\u062B \u062E\u0637\u0623. \u062D\u0627\u0648\u0644 \u0645\u062C\u062F\u062F\u0627\u064B.": "Something went wrong. Please try again.",
   "\u062C\u0645\u064A\u0639 \u0627\u0644\u062D\u0642\u0648\u0642 \u0645\u062D\u0641\u0648\u0638\u0629": "All rights reserved"
 };
-const AUTO_UI_TEXT_EN_TO_AR = Object.fromEntries(
-  Object.entries(AUTO_UI_TEXT_AR_TO_EN).map(([ar, en]) => [en, ar])
+const AUTO_UI_TEXT_EN_TO_AR = Object.entries(AUTO_UI_TEXT_AR_TO_EN).reduce(
+  (result, [ar, en]) => {
+    result[en] = ar;
+    return result;
+  },
+  {}
 );
 const AUTO_UI_AR_ENTRIES = Object.entries(AUTO_UI_TEXT_AR_TO_EN).sort(
   (a, b) => b[0].length - a[0].length
